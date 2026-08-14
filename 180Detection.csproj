@@ -68,6 +68,7 @@
     <EmbeddedResource Include="page\TabDetection.resx">
       <DependentUpon>TabDetection.cs</DependentUpon>
     </EmbeddedResource>
+    <Compile Include="camera\HikCameraService.cs" />
     <Compile Include="model\DetectionResult.cs" />
     <Compile Include="service\InferenceService.cs" />
     <Compile Include="style\UiTheme.cs" />
