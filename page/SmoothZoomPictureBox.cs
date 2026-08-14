@@ -16,7 +16,7 @@ namespace _180Detection
         private const double WheelZoomStep = 1.15D;
         private const double AnimationBlend = 0.34D;
 
-        private readonly Timer _animationTimer;
+        private readonly System.Windows.Forms.Timer _animationTimer;
         private Image _trackedImage;
         private double _currentZoom = 1D;
         private double _targetZoom = 1D;
@@ -46,7 +46,7 @@ namespace _180Detection
             BackColor = Color.FromArgb(40, 40, 40);
             TabStop = true;
 
-            _animationTimer = new Timer();
+            _animationTimer = new System.Windows.Forms.Timer();
             _animationTimer.Interval = 15;
             _animationTimer.Tick += AnimationTimer_Tick;
         }
@@ -81,132 +81,138 @@ namespace _180Detection
             if (scale <= 0D)
                 return false;
 
-            RectangleF imageRectangle = GetImageRectangle(scale);
-            if (!imageRectangle.Contains(clientPoint))
+            double imageX = _centerImageX +
+                (clientPoint.X - ClientSize.Width / 2D) / scale;
+            double imageY = _centerImageY +
+                (clientPoint.Y - ClientSize.Height / 2D) / scale;
+
+            if (imageX < 0D || imageY < 0D ||
+                imageX >= image.Width || imageY >= image.Height)
                 return false;
 
-            int column = (int)Math.Floor((clientPoint.X - imageRectangle.Left) / scale);
-            int row = (int)Math.Floor((clientPoint.Y - imageRectangle.Top) / scale);
-            column = Math.Max(0, Math.Min(image.Width - 1, column));
-            row = Math.Max(0, Math.Min(image.Height - 1, row));
-            imagePoint = new Point(column, row);
+            imagePoint = new Point(
+                Math.Max(0, Math.Min(image.Width - 1, (int)Math.Round(imageX))),
+                Math.Max(0, Math.Min(image.Height - 1, (int)Math.Round(imageY))));
             return true;
-        }
-
-        protected override void OnMouseEnter(EventArgs e)
-        {
-            Focus();
-            base.OnMouseEnter(e);
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
-            QueueSmoothZoom(e.Delta, e.Location);
-            HandledMouseEventArgs handledEvent = e as HandledMouseEventArgs;
-            if (handledEvent != null)
-                handledEvent.Handled = true;
-        }
+            base.OnMouseWheel(e);
+            if (Image == null)
+                return;
 
-        protected override void OnMouseDoubleClick(MouseEventArgs e)
-        {
-            FitToWindow();
-            base.OnMouseDoubleClick(e);
+            TrackCurrentImage();
+
+            double factor = e.Delta > 0 ? WheelZoomStep : 1D / WheelZoomStep;
+            double nextZoom = ClampZoom(_targetZoom * factor);
+            if (Math.Abs(nextZoom - _targetZoom) < 0.0001D)
+                return;
+
+            double scale = GetDisplayScale(_currentZoom);
+            if (scale > 0D)
+            {
+                _anchorImageX = _centerImageX +
+                    (e.X - ClientSize.Width / 2D) / scale;
+                _anchorImageY = _centerImageY +
+                    (e.Y - ClientSize.Height / 2D) / scale;
+                _anchorClientPoint = e.Location;
+                _hasZoomAnchor = true;
+            }
+
+            _targetZoom = nextZoom;
+            _interactiveDrawing = true;
+            if (!_animationTimer.Enabled)
+                _animationTimer.Start();
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Middle && Image != null)
-            {
-                _dragging = true;
-                _dragStartPoint = e.Location;
-                _dragStartCenterX = _centerImageX;
-                _dragStartCenterY = _centerImageY;
-                _interactiveDrawing = true;
-                Capture = true;
-                Cursor = Cursors.SizeAll;
-            }
             base.OnMouseDown(e);
+            Focus();
+
+            if (Image == null || e.Button != MouseButtons.Middle)
+                return;
+
+            TrackCurrentImage();
+            _animationTimer.Stop();
+            _currentZoom = _targetZoom;
+            _hasZoomAnchor = false;
+            _interactiveDrawing = true;
+            _dragging = true;
+            _dragStartPoint = e.Location;
+            _dragStartCenterX = _centerImageX;
+            _dragStartCenterY = _centerImageY;
+            Cursor = Cursors.SizeAll;
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            if (_dragging && Image != null)
-            {
-                double scale = GetDisplayScale(_currentZoom);
-                if (scale > 0D)
-                {
-                    _centerImageX = _dragStartCenterX - (e.X - _dragStartPoint.X) / scale;
-                    _centerImageY = _dragStartCenterY - (e.Y - _dragStartPoint.Y) / scale;
-                    ClampImageCenter(scale);
-                    Invalidate();
-                }
-            }
             base.OnMouseMove(e);
-        }
-
-        protected override void OnMouseUp(MouseEventArgs e)
-        {
-            if (_dragging && e.Button == MouseButtons.Middle)
-            {
-                _dragging = false;
-                _interactiveDrawing = false;
-                Capture = false;
-                Cursor = Cursors.Default;
-                Invalidate();
-            }
-            base.OnMouseUp(e);
-        }
-
-        protected override void OnSizeChanged(EventArgs e)
-        {
-            TrackCurrentImage();
-            ClampImageCenter(GetDisplayScale(_currentZoom));
-            base.OnSizeChanged(e);
-            Invalidate();
-        }
-
-        protected override void OnPaintBackground(PaintEventArgs pevent)
-        {
-            pevent.Graphics.Clear(BackColor);
-        }
-
-        protected override void OnPaint(PaintEventArgs pe)
-        {
-            pe.Graphics.Clear(BackColor);
-            Image image = Image;
-            if (image == null || ClientSize.Width <= 0 || ClientSize.Height <= 0)
+            if (!_dragging || Image == null)
                 return;
 
-            TrackCurrentImage();
             double scale = GetDisplayScale(_currentZoom);
             if (scale <= 0D)
                 return;
 
-            RectangleF imageRectangle = GetImageRectangle(scale);
-            RectangleF visibleRectangle = RectangleF.Intersect(
-                imageRectangle,
-                new RectangleF(0F, 0F, ClientSize.Width, ClientSize.Height));
-            if (visibleRectangle.Width <= 0F || visibleRectangle.Height <= 0F)
+            _centerImageX = _dragStartCenterX -
+                (e.X - _dragStartPoint.X) / scale;
+            _centerImageY = _dragStartCenterY -
+                (e.Y - _dragStartPoint.Y) / scale;
+            ClampCenter();
+            Invalidate();
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (e.Button != MouseButtons.Middle)
                 return;
 
-            RectangleF sourceRectangle = new RectangleF(
-                (float)((visibleRectangle.Left - imageRectangle.Left) / scale),
-                (float)((visibleRectangle.Top - imageRectangle.Top) / scale),
-                (float)(visibleRectangle.Width / scale),
-                (float)(visibleRectangle.Height / scale));
+            _dragging = false;
+            Cursor = Cursors.Default;
+        }
 
-            pe.Graphics.CompositingMode = CompositingMode.SourceCopy;
-            pe.Graphics.CompositingQuality = _interactiveDrawing
-                ? CompositingQuality.HighSpeed
-                : CompositingQuality.AssumeLinear;
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
+        {
+            base.OnMouseDoubleClick(e);
+            FitToWindow();
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            TrackCurrentImage();
+            ClampCenter();
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs pe)
+        {
+            if (Image == null)
+            {
+                base.OnPaint(pe);
+                return;
+            }
+
+            TrackCurrentImage();
+
+            pe.Graphics.Clear(BackColor);
             pe.Graphics.InterpolationMode = _interactiveDrawing
-                ? InterpolationMode.Bilinear
-                : InterpolationMode.HighQualityBilinear;
-            pe.Graphics.PixelOffsetMode = _interactiveDrawing
-                ? PixelOffsetMode.HighSpeed
-                : PixelOffsetMode.HighQuality;
+                ? InterpolationMode.HighQualityBilinear
+                : InterpolationMode.HighQualityBicubic;
+            pe.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            pe.Graphics.CompositingQuality = CompositingQuality.HighSpeed;
             pe.Graphics.SmoothingMode = SmoothingMode.None;
-            pe.Graphics.DrawImage(image, visibleRectangle, sourceRectangle, GraphicsUnit.Pixel);
+
+            double scale = GetDisplayScale(_currentZoom);
+            float width = (float)(Image.Width * scale);
+            float height = (float)(Image.Height * scale);
+            float left = (float)(ClientSize.Width / 2D - _centerImageX * scale);
+            float top = (float)(ClientSize.Height / 2D - _centerImageY * scale);
+
+            pe.Graphics.DrawImage(Image, left, top, width, height);
         }
 
         protected override void Dispose(bool disposing)
@@ -219,66 +225,40 @@ namespace _180Detection
             base.Dispose(disposing);
         }
 
-        private void QueueSmoothZoom(int wheelDelta, Point clientPoint)
-        {
-            Image image = Image;
-            if (image == null || wheelDelta == 0)
-                return;
-
-            TrackCurrentImage();
-            double currentScale = GetDisplayScale(_currentZoom);
-            if (currentScale <= 0D)
-                return;
-
-            _anchorImageX = _centerImageX +
-                (clientPoint.X - ClientSize.Width / 2D) / currentScale;
-            _anchorImageY = _centerImageY +
-                (clientPoint.Y - ClientSize.Height / 2D) / currentScale;
-            _anchorImageX = Math.Max(0D, Math.Min(image.Width, _anchorImageX));
-            _anchorImageY = Math.Max(0D, Math.Min(image.Height, _anchorImageY));
-            _anchorClientPoint = clientPoint;
-            _hasZoomAnchor = true;
-
-            double wheelSteps = (double)wheelDelta / SystemInformation.MouseWheelScrollDelta;
-            _targetZoom *= Math.Pow(WheelZoomStep, wheelSteps);
-            _targetZoom = Math.Max(MinZoom, Math.Min(MaxZoom, _targetZoom));
-            _interactiveDrawing = true;
-            if (!_animationTimer.Enabled)
-                _animationTimer.Start();
-        }
-
         private void AnimationTimer_Tick(object sender, EventArgs e)
         {
-            if (Image == null)
+            double difference = _targetZoom - _currentZoom;
+            if (Math.Abs(difference) < 0.002D)
             {
+                _currentZoom = _targetZoom;
+                ApplyAnchor();
+                ClampCenter();
                 _animationTimer.Stop();
+                _interactiveDrawing = false;
+                _hasZoomAnchor = false;
+                Invalidate();
                 return;
             }
 
-            double logarithmicDistance = Math.Log(_targetZoom / _currentZoom);
-            bool finished = Math.Abs(logarithmicDistance) < 0.0015D;
-            _currentZoom = finished
-                ? _targetZoom
-                : _currentZoom * Math.Exp(logarithmicDistance * AnimationBlend);
+            _currentZoom += difference * AnimationBlend;
+            ApplyAnchor();
+            ClampCenter();
+            Invalidate();
+        }
+
+        private void ApplyAnchor()
+        {
+            if (!_hasZoomAnchor || Image == null)
+                return;
 
             double scale = GetDisplayScale(_currentZoom);
-            if (_hasZoomAnchor && scale > 0D)
-            {
-                _centerImageX = _anchorImageX -
-                    (_anchorClientPoint.X - ClientSize.Width / 2D) / scale;
-                _centerImageY = _anchorImageY -
-                    (_anchorClientPoint.Y - ClientSize.Height / 2D) / scale;
-            }
-            ClampImageCenter(scale);
-            Invalidate();
+            if (scale <= 0D)
+                return;
 
-            if (finished)
-            {
-                _animationTimer.Stop();
-                _hasZoomAnchor = false;
-                _interactiveDrawing = false;
-                Invalidate();
-            }
+            _centerImageX = _anchorImageX -
+                (_anchorClientPoint.X - ClientSize.Width / 2D) / scale;
+            _centerImageY = _anchorImageY -
+                (_anchorClientPoint.Y - ClientSize.Height / 2D) / scale;
         }
 
         private void TrackCurrentImage()
@@ -287,7 +267,6 @@ namespace _180Detection
                 return;
 
             _trackedImage = Image;
-            _animationTimer.Stop();
             _currentZoom = 1D;
             _targetZoom = 1D;
             _hasZoomAnchor = false;
@@ -309,62 +288,49 @@ namespace _180Detection
             _centerImageY = image.Height / 2D;
         }
 
+        private void ClampCenter()
+        {
+            Image image = Image;
+            if (image == null || ClientSize.Width <= 0 || ClientSize.Height <= 0)
+                return;
+
+            double scale = GetDisplayScale(_currentZoom);
+            if (scale <= 0D)
+                return;
+
+            double halfVisibleWidth = ClientSize.Width / (2D * scale);
+            double halfVisibleHeight = ClientSize.Height / (2D * scale);
+
+            if (halfVisibleWidth >= image.Width / 2D)
+                _centerImageX = image.Width / 2D;
+            else
+                _centerImageX = Math.Max(
+                    halfVisibleWidth,
+                    Math.Min(image.Width - halfVisibleWidth, _centerImageX));
+
+            if (halfVisibleHeight >= image.Height / 2D)
+                _centerImageY = image.Height / 2D;
+            else
+                _centerImageY = Math.Max(
+                    halfVisibleHeight,
+                    Math.Min(image.Height - halfVisibleHeight, _centerImageY));
+        }
+
         private double GetDisplayScale(double zoom)
         {
             Image image = Image;
-            if (image == null || image.Width <= 0 || image.Height <= 0 ||
-                ClientSize.Width <= 0 || ClientSize.Height <= 0)
-            {
+            if (image == null || ClientSize.Width <= 0 || ClientSize.Height <= 0)
                 return 0D;
-            }
 
             double fitScale = Math.Min(
-                (double)ClientSize.Width / image.Width,
-                (double)ClientSize.Height / image.Height);
+                ClientSize.Width / (double)image.Width,
+                ClientSize.Height / (double)image.Height);
             return fitScale * zoom;
         }
 
-        private RectangleF GetImageRectangle(double scale)
+        private static double ClampZoom(double value)
         {
-            Image image = Image;
-            float width = (float)(image.Width * scale);
-            float height = (float)(image.Height * scale);
-            float left = (float)(ClientSize.Width / 2D - _centerImageX * scale);
-            float top = (float)(ClientSize.Height / 2D - _centerImageY * scale);
-            return new RectangleF(left, top, width, height);
-        }
-
-        private void ClampImageCenter(double scale)
-        {
-            Image image = Image;
-            if (image == null || scale <= 0D)
-                return;
-
-            double displayWidth = image.Width * scale;
-            if (displayWidth <= ClientSize.Width)
-            {
-                _centerImageX = image.Width / 2D;
-            }
-            else
-            {
-                double visibleHalfWidth = ClientSize.Width / (2D * scale);
-                _centerImageX = Math.Max(
-                    visibleHalfWidth,
-                    Math.Min(image.Width - visibleHalfWidth, _centerImageX));
-            }
-
-            double displayHeight = image.Height * scale;
-            if (displayHeight <= ClientSize.Height)
-            {
-                _centerImageY = image.Height / 2D;
-            }
-            else
-            {
-                double visibleHalfHeight = ClientSize.Height / (2D * scale);
-                _centerImageY = Math.Max(
-                    visibleHalfHeight,
-                    Math.Min(image.Height - visibleHalfHeight, _centerImageY));
-            }
+            return Math.Max(MinZoom, Math.Min(MaxZoom, value));
         }
     }
 }
