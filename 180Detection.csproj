@@ -10,9 +10,11 @@
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DefaultItemExcludes>$(DefaultItemExcludes);runtime\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="runtime\**\*.cs" />
     <Compile Remove="Properties\Settings.Designer.cs" />
     <Compile Remove="service\InferenceService.cs" />
     <Compile Remove="page\TabMain.cs" />
