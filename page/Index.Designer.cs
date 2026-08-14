@@ -11,6 +11,7 @@ namespace _180Detection
         private Panel panelContent;
         private Label lblBrand;
         private Label lblCurrentProduct;
+        private Label lblCameraStatus;
         private Label lblModelStatus;
         private Button btnDetection;
         private Button btnRecords;
@@ -37,6 +38,7 @@ namespace _180Detection
             panelContent = new Panel();
             lblBrand = new Label();
             lblCurrentProduct = new Label();
+            lblCameraStatus = new Label();
             lblModelStatus = new Label();
             btnDetection = CreateTopNavigationButton("检测工作台", true);
             btnRecords = CreateTopNavigationButton("检测记录", false);
@@ -88,10 +90,11 @@ namespace _180Detection
 
             TableLayoutPanel headerLayout = new TableLayoutPanel();
             headerLayout.BackColor = UiTheme.Surface;
-            headerLayout.ColumnCount = 4;
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            headerLayout.ColumnCount = 5;
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 165F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
             headerLayout.RowCount = 2;
             headerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -110,7 +113,7 @@ namespace _180Detection
             navigation.BackColor = UiTheme.Surface;
             navigation.Dock = DockStyle.Fill;
             navigation.Margin = Padding.Empty;
-            navigation.Padding = new Padding(0);
+            navigation.Padding = Padding.Empty;
             navigation.WrapContents = false;
 
             btnDetection.Click += new System.EventHandler(btnDetection_Click);
@@ -122,19 +125,10 @@ namespace _180Detection
                 btnDetection, btnRecords, btnProduct, btnSettings
             });
 
-            lblCurrentProduct.Dock = DockStyle.Fill;
-            lblCurrentProduct.Font = new Font("Microsoft YaHei UI", 9F);
-            lblCurrentProduct.ForeColor = UiTheme.TextSecondary;
-            lblCurrentProduct.Padding = new Padding(0, 0, 12, 0);
-            lblCurrentProduct.Text = "当前产品：Phone";
-            lblCurrentProduct.TextAlign = ContentAlignment.MiddleRight;
-
-            lblModelStatus.Dock = DockStyle.Fill;
-            lblModelStatus.Font = new Font("Microsoft YaHei UI", 9F);
-            lblModelStatus.ForeColor = UiTheme.TextSecondary;
+            ConfigureHeaderStatusLabel(lblCurrentProduct, "当前产品：Phone");
+            ConfigureHeaderStatusLabel(lblCameraStatus, "相机：未连接");
+            ConfigureHeaderStatusLabel(lblModelStatus, "○ 推理脚本未配置");
             lblModelStatus.Padding = new Padding(0, 0, 18, 0);
-            lblModelStatus.Text = "○ 推理脚本未配置";
-            lblModelStatus.TextAlign = ContentAlignment.MiddleRight;
 
             Panel separator = new Panel();
             separator.BackColor = UiTheme.Border;
@@ -144,10 +138,21 @@ namespace _180Detection
             headerLayout.Controls.Add(lblBrand, 0, 0);
             headerLayout.Controls.Add(navigation, 1, 0);
             headerLayout.Controls.Add(lblCurrentProduct, 2, 0);
-            headerLayout.Controls.Add(lblModelStatus, 3, 0);
+            headerLayout.Controls.Add(lblCameraStatus, 3, 0);
+            headerLayout.Controls.Add(lblModelStatus, 4, 0);
             headerLayout.Controls.Add(separator, 0, 1);
-            headerLayout.SetColumnSpan(separator, 4);
+            headerLayout.SetColumnSpan(separator, 5);
             panelHeader.Controls.Add(headerLayout);
+        }
+
+        private static void ConfigureHeaderStatusLabel(Label label, string text)
+        {
+            label.Dock = DockStyle.Fill;
+            label.Font = new Font("Microsoft YaHei UI", 8.5F);
+            label.ForeColor = UiTheme.TextSecondary;
+            label.Padding = new Padding(0, 0, 12, 0);
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleRight;
         }
 
         private void BuildContent()
