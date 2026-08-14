@@ -10,6 +10,8 @@ namespace _180Detection
         private Panel panelToolbar;
         private ComboBox cmbProduct;
         private Label lblModelState;
+        private Label lblCameraState;
+        private Button btnCameraConnect;
         private Button btnChooseImage;
         private Button btnDetect;
         private Button btnOpenDirectory;
@@ -39,6 +41,8 @@ namespace _180Detection
             panelToolbar = new Panel();
             cmbProduct = new ComboBox();
             lblModelState = new Label();
+            lblCameraState = new Label();
+            btnCameraConnect = CreateToolbarButton("连接相机", 86, false);
             btnChooseImage = CreateToolbarButton("选择图片", 96, false);
             btnDetect = CreateToolbarButton("开始检测", 96, true);
             btnOpenDirectory = CreateToolbarButton("打开目录", 96, false);
@@ -100,9 +104,10 @@ namespace _180Detection
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.BackColor = UiTheme.Surface;
-            layout.ColumnCount = 2;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
+            layout.ColumnCount = 3;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
             layout.Dock = DockStyle.Fill;
             layout.Margin = Padding.Empty;
             layout.Padding = new Padding(12, 6, 10, 5);
@@ -113,12 +118,8 @@ namespace _180Detection
             productFlow.Margin = Padding.Empty;
             productFlow.WrapContents = false;
 
-            Label productCaption = new Label();
-            productCaption.AutoSize = true;
-            productCaption.Font = new Font("Microsoft YaHei UI", 9F);
-            productCaption.ForeColor = UiTheme.TextSecondary;
+            Label productCaption = CreateToolbarCaption("产品");
             productCaption.Margin = new Padding(0, 7, 8, 0);
-            productCaption.Text = "产品";
 
             cmbProduct.BackColor = Color.White;
             cmbProduct.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -126,18 +127,40 @@ namespace _180Detection
             cmbProduct.Font = new Font("Microsoft YaHei UI", 9F);
             cmbProduct.ForeColor = UiTheme.TextPrimary;
             cmbProduct.Margin = new Padding(0, 2, 18, 0);
-            cmbProduct.Size = new Size(156, 28);
+            cmbProduct.Size = new Size(145, 28);
             cmbProduct.SelectedIndexChanged +=
                 new System.EventHandler(cmbProduct_SelectedIndexChanged);
 
             lblModelState.AutoSize = true;
-            lblModelState.Font = new Font("Microsoft YaHei UI", 8.5F);
+            lblModelState.Font = new Font("Microsoft YaHei UI", 8F);
             lblModelState.ForeColor = UiTheme.TextMuted;
             lblModelState.Margin = new Padding(0, 7, 0, 0);
             lblModelState.Text = "○ 推理脚本未配置";
 
             productFlow.Controls.AddRange(
                 new Control[] { productCaption, cmbProduct, lblModelState });
+
+            FlowLayoutPanel cameraFlow = new FlowLayoutPanel();
+            cameraFlow.BackColor = UiTheme.Surface;
+            cameraFlow.Dock = DockStyle.Fill;
+            cameraFlow.Margin = Padding.Empty;
+            cameraFlow.WrapContents = false;
+
+            Label cameraCaption = CreateToolbarCaption("相机");
+            cameraCaption.Margin = new Padding(0, 7, 8, 0);
+
+            lblCameraState.AutoSize = true;
+            lblCameraState.Font = new Font("Microsoft YaHei UI", 8F);
+            lblCameraState.ForeColor = UiTheme.TextMuted;
+            lblCameraState.Margin = new Padding(0, 7, 10, 0);
+            lblCameraState.Text = "○ MV-CS200-10GM 未连接";
+
+            btnCameraConnect.Margin = new Padding(0, 0, 0, 0);
+            btnCameraConnect.Click +=
+                new System.EventHandler(btnCameraConnect_Click);
+
+            cameraFlow.Controls.AddRange(
+                new Control[] { cameraCaption, lblCameraState, btnCameraConnect });
 
             FlowLayoutPanel actionFlow = new FlowLayoutPanel();
             actionFlow.BackColor = UiTheme.Surface;
@@ -161,8 +184,19 @@ namespace _180Detection
                 new Control[] { btnOpenDirectory, btnDetect, btnChooseImage });
 
             layout.Controls.Add(productFlow, 0, 0);
-            layout.Controls.Add(actionFlow, 1, 0);
+            layout.Controls.Add(cameraFlow, 1, 0);
+            layout.Controls.Add(actionFlow, 2, 0);
             panelToolbar.Controls.Add(layout);
+        }
+
+        private static Label CreateToolbarCaption(string text)
+        {
+            Label label = new Label();
+            label.AutoSize = true;
+            label.Font = new Font("Microsoft YaHei UI", 9F);
+            label.ForeColor = UiTheme.TextSecondary;
+            label.Text = text;
+            return label;
         }
 
         private void BuildMainArea()
@@ -237,7 +271,7 @@ namespace _180Detection
             lblViewerHint.Font = new Font("Microsoft YaHei UI", 10F);
             lblViewerHint.ForeColor = UiTheme.ViewerText;
             lblViewerHint.Text =
-                "请选择待检测图片\r\n检测后仅显示最终 marked 结果";
+                "请选择待检测图片\r\n相机接入后可直接使用采集图像";
             lblViewerHint.TextAlign = ContentAlignment.MiddleCenter;
 
             viewport.Controls.Add(pictureResult);
