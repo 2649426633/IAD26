@@ -94,38 +94,50 @@ namespace _180Detection
             panelHeader.Dock = DockStyle.Fill;
             panelHeader.Margin = Padding.Empty;
 
+            TableLayoutPanel headerLayout = new TableLayoutPanel();
+            headerLayout.ColumnCount = 5;
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
+            headerLayout.Dock = DockStyle.Fill;
+            headerLayout.Margin = Padding.Empty;
+
+            lblBrand.Dock = DockStyle.Fill;
             lblBrand.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point, 134);
             lblBrand.ForeColor = Color.FromArgb(30, 41, 55);
-            lblBrand.Location = new Point(20, 17);
-            lblBrand.Size = new Size(176, 34);
+            lblBrand.Padding = new Padding(20, 0, 0, 0);
             lblBrand.Text = "科准 IAD";
             lblBrand.TextAlign = ContentAlignment.MiddleLeft;
 
-            lblPageTitle.AutoSize = true;
+            lblPageTitle.Dock = DockStyle.Fill;
             lblPageTitle.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point, 134);
             lblPageTitle.ForeColor = Color.FromArgb(54, 65, 78);
-            lblPageTitle.Location = new Point(226, 22);
+            lblPageTitle.Padding = new Padding(16, 0, 0, 0);
             lblPageTitle.Text = "检测工作台";
+            lblPageTitle.TextAlign = ContentAlignment.MiddleLeft;
 
-            lblCurrentProduct.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblCurrentProduct.Dock = DockStyle.Fill;
             lblCurrentProduct.Font = new Font("Microsoft YaHei UI", 10F);
             lblCurrentProduct.ForeColor = Color.FromArgb(82, 92, 105);
-            lblCurrentProduct.Location = new Point(1044, 23);
-            lblCurrentProduct.Size = new Size(176, 24);
+            lblCurrentProduct.Padding = new Padding(0, 0, 12, 0);
             lblCurrentProduct.Text = "当前产品：Phone";
             lblCurrentProduct.TextAlign = ContentAlignment.MiddleRight;
 
-            lblModelStatus.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblModelStatus.Dock = DockStyle.Fill;
             lblModelStatus.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
             lblModelStatus.ForeColor = Color.FromArgb(229, 152, 52);
-            lblModelStatus.Location = new Point(1240, 23);
-            lblModelStatus.Size = new Size(174, 24);
+            lblModelStatus.Padding = new Padding(0, 0, 22, 0);
             lblModelStatus.Text = "● 模型待接入";
             lblModelStatus.TextAlign = ContentAlignment.MiddleRight;
 
-            panelHeader.Controls.AddRange(new Control[] {
-                lblBrand, lblPageTitle, lblCurrentProduct, lblModelStatus
-            });
+            headerLayout.Controls.Add(lblBrand, 0, 0);
+            headerLayout.Controls.Add(lblPageTitle, 1, 0);
+            headerLayout.Controls.Add(new Panel(), 2, 0);
+            headerLayout.Controls.Add(lblCurrentProduct, 3, 0);
+            headerLayout.Controls.Add(lblModelStatus, 4, 0);
+            panelHeader.Controls.Add(headerLayout);
         }
 
         private void BuildSidebar()
@@ -142,11 +154,11 @@ namespace _180Detection
             caption.Text = "功能导航";
 
             Label version = new Label();
-            version.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            version.Dock = DockStyle.Bottom;
             version.Font = new Font("Microsoft YaHei UI", 8.5F);
             version.ForeColor = Color.FromArgb(128, 145, 164);
-            version.Location = new Point(18, 786);
-            version.Size = new Size(174, 24);
+            version.Height = 48;
+            version.Padding = new Padding(18, 0, 0, 14);
             version.Text = "Inference UI v0.1";
 
             btnDetection.Click += new System.EventHandler(btnDetection_Click);

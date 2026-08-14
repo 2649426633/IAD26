@@ -187,8 +187,8 @@ namespace _180Detection
             subtitle.Location = new Point(130, 14);
             subtitle.Text = "滚轮缩放 · 中键拖动 · 双击复位";
 
-            btnFitImage.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnFitImage.Location = new Point(736, 8);
+            btnFitImage.Dock = DockStyle.Right;
+            btnFitImage.Width = 92;
             btnFitImage.Click += new System.EventHandler(btnFitImage_Click);
             header.Controls.AddRange(new Control[] { title, subtitle, btnFitImage });
 
