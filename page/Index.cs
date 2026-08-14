@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Drawing;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using _180Detection.Camera;
 using _180Detection.Models;
 using _180Detection.Services;
 
@@ -12,6 +16,7 @@ namespace _180Detection
         private readonly Color _inactiveNavigationColor = UiTheme.Surface;
         private readonly Color _navigationHoverColor = UiTheme.NavigationHover;
         private readonly InferenceService _inferenceService;
+        private readonly HikCameraService _cameraService;
 
         public TabDetection TabDetectionPage
         {
@@ -23,19 +28,30 @@ namespace _180Detection
             InitializeComponent();
 
             _inferenceService = InferenceService.FromConfiguration();
+            _cameraService = new HikCameraService();
+
             ConfigureNavigationButtons();
 
             tabDetection.DetectRequested += TabDetection_DetectRequested;
             tabDetection.ProductChanged += TabDetection_ProductChanged;
+            tabDetection.CameraConnectionRequested += TabDetection_CameraConnectionRequested;
 
             ShowDetectionPage();
             RefreshInferenceStatus();
+            RefreshCameraStatus();
         }
 
         private void Index_Load(object sender, EventArgs e)
         {
             WindowState = FormWindowState.Maximized;
             RefreshInferenceStatus();
+            RefreshCameraStatus();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            _cameraService.Dispose();
+            base.OnFormClosed(e);
         }
 
         private void ConfigureNavigationButtons()
@@ -87,7 +103,7 @@ namespace _180Detection
             ShowPlaceholderPage(
                 btnSettings,
                 "系统设置",
-                "Python 推理接口已经接入。下一阶段将在此提供 Python 解释器、推理脚本、结果目录、保存策略和日志目录的可视化配置。");
+                "用于配置 Python 推理、海康 MVS SDK、相机型号、结果目录、保存策略和日志目录。");
         }
 
         private void ShowDetectionPage()
@@ -124,6 +140,70 @@ namespace _180Detection
                     ? UiTheme.NavigationActive
                     : UiTheme.NavigationHover;
                 button.FlatAppearance.MouseDownBackColor = UiTheme.NavigationPressed;
+            }
+        }
+
+        private async void TabDetection_CameraConnectionRequested(object sender, EventArgs e)
+        {
+            tabDetection.SetCameraBusy(true);
+
+            try
+            {
+                if (_cameraService.IsConnected)
+                {
+                    await Task.Run(() => _cameraService.Disconnect());
+                    SetCameraStatus("未连接", false);
+                    return;
+                }
+
+                string expectedModel = ConfigurationManager.AppSettings["CameraExpectedModel"];
+                if (string.IsNullOrWhiteSpace(expectedModel))
+                    expectedModel = "MV-CS200-10GM";
+
+                IList<HikCameraDevice> devices =
+                    await Task.Run(() => _cameraService.RefreshDevices());
+
+                if (devices == null || devices.Count == 0)
+                    throw new InvalidOperationException(_cameraService.GetStatusText());
+
+                int selectedIndex = -1;
+                for (int i = 0; i < devices.Count; i++)
+                {
+                    string displayName = devices[i].DisplayName ?? string.Empty;
+                    if (displayName.IndexOf(expectedModel, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+
+                if (selectedIndex < 0)
+                {
+                    var names = new List<string>();
+                    foreach (HikCameraDevice device in devices)
+                        names.Add(device.DisplayName);
+
+                    throw new InvalidOperationException(
+                        "未找到指定相机 " + expectedModel +
+                        "。当前发现：" + string.Join("，", names.ToArray()));
+                }
+
+                await Task.Run(() => _cameraService.Connect(selectedIndex));
+
+                string connectedName = string.IsNullOrWhiteSpace(_cameraService.ConnectedCameraName)
+                    ? expectedModel
+                    : _cameraService.ConnectedCameraName;
+
+                SetCameraStatus(connectedName, true);
+            }
+            catch (Exception ex)
+            {
+                SetCameraStatus("连接失败", false);
+                tabDetection.ShowCameraError(ex.Message);
+            }
+            finally
+            {
+                tabDetection.SetCameraBusy(false);
             }
         }
 
@@ -180,6 +260,19 @@ namespace _180Detection
             tabDetection.SetInferenceAvailable(configured);
         }
 
+        private void RefreshCameraStatus()
+        {
+            if (_cameraService.IsConnected)
+            {
+                SetCameraStatus(_cameraService.ConnectedCameraName, true);
+                return;
+            }
+
+            SetCameraStatus(
+                _cameraService.IsSdkAvailable ? "未连接" : "MVS SDK 未就绪",
+                false);
+        }
+
         public void SetCurrentProduct(string productName)
         {
             lblCurrentProduct.Text = "当前产品：" +
@@ -193,6 +286,20 @@ namespace _180Detection
             lblModelStatus.ForeColor = ready
                 ? UiTheme.TextPrimary
                 : UiTheme.TextSecondary;
+        }
+
+        public void SetCameraStatus(string statusText, bool connected)
+        {
+            string text = string.IsNullOrWhiteSpace(statusText)
+                ? "未连接"
+                : statusText.Trim();
+
+            lblCameraStatus.Text = "相机：" + text;
+            lblCameraStatus.ForeColor = connected
+                ? UiTheme.TextPrimary
+                : UiTheme.TextSecondary;
+
+            tabDetection.SetCameraStatus(text, connected);
         }
     }
 }
