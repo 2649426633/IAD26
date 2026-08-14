@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="180Detection.csproj" Id="9327bb1a-c202-4385-8699-0adac0bb4595" />
+  <Project Path="runtime\IndustrialAnomaly.Runtime\IndustrialAnomaly.Runtime.csproj" />
 </Solution>

@@ -19,11 +19,7 @@ namespace _180Detection
         public event EventHandler ProductChanged;
         public event EventHandler CameraConnectionRequested;
 
-        public string SelectedImagePath
-        {
-            get { return _selectedImagePath; }
-        }
-
+        public string SelectedImagePath { get { return _selectedImagePath; } }
         public string SelectedProduct
         {
             get
@@ -38,7 +34,6 @@ namespace _180Detection
         {
             InitializeComponent();
             lblViewerHint.BringToFront();
-
             cmbProduct.Items.Add("Phone");
             cmbProduct.SelectedIndex = 0;
             Disposed += TabDetection_Disposed;
@@ -70,10 +65,7 @@ namespace _180Detection
                 int selectedIndex = -1;
                 for (int i = 0; i < cmbProduct.Items.Count; i++)
                 {
-                    if (string.Equals(
-                        cmbProduct.Items[i].ToString(),
-                        selectedProduct,
-                        StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(cmbProduct.Items[i].ToString(), selectedProduct, StringComparison.OrdinalIgnoreCase))
                     {
                         selectedIndex = i;
                         break;
@@ -101,10 +93,9 @@ namespace _180Detection
 
             _inferenceAvailable = available;
             UpdateDetectButtonState();
-
             lblServiceHint.Text = available
-                ? "Python 推理接口已配置 · 选择图片后可直接检测"
-                : "Python 推理接口已接入 · 请先配置解释器和推理脚本";
+                ? "ONNX Runtime 已配置 · 选择图片后可直接检测"
+                : "ONNX Runtime 未就绪 · 请检查 Engine / 产品模型";
         }
 
         public void SetModelStatus(string text, bool ready)
@@ -116,10 +107,8 @@ namespace _180Detection
             }
 
             lblModelState.Text = (ready ? "● " : "○ ") +
-                (string.IsNullOrWhiteSpace(text) ? "模型状态未知" : text.Trim());
-            lblModelState.ForeColor = ready
-                ? UiTheme.TextPrimary
-                : UiTheme.TextSecondary;
+                (string.IsNullOrWhiteSpace(text) ? "ONNX 状态未知" : text.Trim());
+            lblModelState.ForeColor = ready ? UiTheme.TextPrimary : UiTheme.TextSecondary;
         }
 
         public void SetCameraStatus(string text, bool connected)
@@ -131,16 +120,9 @@ namespace _180Detection
             }
 
             _cameraConnected = connected;
-
-            string status = string.IsNullOrWhiteSpace(text)
-                ? "未连接"
-                : text.Trim();
-
+            string status = string.IsNullOrWhiteSpace(text) ? "未连接" : text.Trim();
             lblCameraState.Text = (connected ? "● " : "○ ") + status;
-            lblCameraState.ForeColor = connected
-                ? UiTheme.TextPrimary
-                : UiTheme.TextMuted;
-
+            lblCameraState.ForeColor = connected ? UiTheme.TextPrimary : UiTheme.TextMuted;
             btnCameraConnect.Text = connected ? "断开相机" : "连接相机";
             UpdateCameraButtonState();
         }
@@ -155,7 +137,6 @@ namespace _180Detection
 
             _cameraBusy = busy;
             UpdateCameraButtonState();
-
             if (busy)
             {
                 btnCameraConnect.Text = "处理中...";
@@ -173,7 +154,6 @@ namespace _180Detection
 
             lblCameraState.Text = "○ 相机连接失败";
             lblCameraState.ForeColor = UiTheme.TextSecondary;
-
             MessageBox.Show(
                 string.IsNullOrWhiteSpace(message) ? "相机连接失败。" : message,
                 "海康相机",
@@ -199,11 +179,11 @@ namespace _180Detection
 
             if (busy)
             {
-                lblStatus.Text = "状态：正在调用 Python 推理...";
+                lblStatus.Text = "状态：ONNX Runtime 推理中...";
                 lblElapsed.Text = "耗时：-- ms";
                 lblResultState.Text = "检测中";
                 lblResultState.ForeColor = UiTheme.TextPrimary;
-                lblServiceHint.Text = "推理进程运行中，请勿重复提交";
+                lblServiceHint.Text = "ONNX Session 常驻 · 正在执行当前图像";
             }
         }
 
@@ -211,7 +191,6 @@ namespace _180Detection
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
-
             if (InvokeRequired)
             {
                 BeginInvoke(new Action<DetectionResult>(DisplayResult), result);
@@ -221,37 +200,44 @@ namespace _180Detection
             string displayImagePath = !string.IsNullOrWhiteSpace(result.MarkedImagePath)
                 ? result.MarkedImagePath
                 : result.ImagePath;
-
             if (!string.IsNullOrWhiteSpace(displayImagePath) && File.Exists(displayImagePath))
                 LoadImageIntoViewer(displayImagePath);
 
-            lblResultState.Text = result.IsNg ? "NG" : "PASS";
+            string decision = string.IsNullOrWhiteSpace(result.Decision)
+                ? (result.IsNg ? "NG" : "PASS")
+                : result.Decision.Trim().ToUpperInvariant();
+
+            lblResultState.Text = decision == "UNCALIBRATED"
+                ? "未标定"
+                : decision;
             lblResultState.ForeColor = UiTheme.TextPrimary;
 
-            lblDefectValue.Text = result.IsNg
-                ? (string.IsNullOrWhiteSpace(result.DefectClass)
-                    ? "Unknown"
-                    : result.DefectClass)
-                : "Normal";
-            lblScoreValue.Text = result.AnomalyScore.ToString("0.0000");
-            lblSimilarityValue.Text = FormatSimilarity(result.Similarity);
-            lblTimeValue.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            lblDefectValue.Text = decision == "PASS"
+                ? "Normal"
+                : string.IsNullOrWhiteSpace(result.DefectClass) ? "--" : result.DefectClass;
+            lblScoreValue.Text = result.AnomalyScore.ToString("0.000000");
+            lblSimilarityValue.Text = string.IsNullOrWhiteSpace(result.DefectClass)
+                ? "--"
+                : FormatSimilarity(result.Similarity);
+            lblTimeValue.Text = (result.RecordTime == default ? DateTime.Now : result.RecordTime)
+                .ToString("yyyy-MM-dd HH:mm:ss");
 
             string sourcePath = string.IsNullOrWhiteSpace(result.ImagePath)
                 ? _selectedImagePath
                 : result.ImagePath;
-
             lblFileValue.Text = string.IsNullOrWhiteSpace(sourcePath)
                 ? "--"
                 : Path.GetFileName(sourcePath);
 
-            lblStatus.Text = "状态：检测完成";
-            lblElapsed.Text =
-                "耗时：" + Math.Max(0L, result.ElapsedMilliseconds) + " ms";
+            lblStatus.Text = decision == "UNCALIBRATED"
+                ? "状态：检测完成 · PASS/NG 阈值未标定"
+                : "状态：检测完成";
+            lblElapsed.Text = "耗时：" + Math.Max(0L, result.ElapsedMilliseconds) + " ms";
             lblStatusFile.Text = string.IsNullOrWhiteSpace(sourcePath)
                 ? "文件：--"
                 : "文件：" + Path.GetFileName(sourcePath);
-            lblServiceHint.Text = "推理完成 · 已读取 Python JSON 最终结果";
+            lblServiceHint.Text = "ONNX Runtime 推理完成 · " +
+                (string.IsNullOrWhiteSpace(result.FinalResult) ? decision : result.FinalResult);
             lblViewerHint.Visible = pictureResult.Image == null;
         }
 
@@ -268,7 +254,7 @@ namespace _180Detection
             lblStatus.Text = "状态：检测失败";
             lblElapsed.Text = "耗时：-- ms";
             lblServiceHint.Text = string.IsNullOrWhiteSpace(message)
-                ? "推理发生未知错误"
+                ? "ONNX 推理发生未知错误"
                 : message.Trim();
         }
 
@@ -294,81 +280,57 @@ namespace _180Detection
 
         private void btnCameraConnect_Click(object sender, EventArgs e)
         {
-            EventHandler handler = CameraConnectionRequested;
-            if (handler != null)
-                handler(this, EventArgs.Empty);
+            CameraConnectionRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void btnChooseImage_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog dialog = new OpenFileDialog())
+            using OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Title = "选择待检测图片";
+            dialog.Filter = "图片文件|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff|所有文件|*.*";
+            dialog.RestoreDirectory = true;
+            if (dialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            try
             {
-                dialog.Title = "选择待检测图片";
-                dialog.Filter =
-                    "图片文件|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff|所有文件|*.*";
-                dialog.RestoreDirectory = true;
-
-                if (dialog.ShowDialog() != DialogResult.OK)
-                    return;
-
-                try
-                {
-                    _selectedImagePath = dialog.FileName;
-                    LoadImageIntoViewer(_selectedImagePath);
-                    ClearResult();
-
-                    lblResultState.Text = "待检测";
-                    lblResultState.ForeColor = UiTheme.TextPrimary;
-                    lblStatus.Text = _inferenceAvailable
-                        ? "状态：图片已选择，等待检测"
-                        : "状态：图片已选择，但推理尚未配置";
-                    lblStatusFile.Text =
-                        "文件：" + Path.GetFileName(_selectedImagePath);
-
-                    UpdateDetectButtonState();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(
-                        "无法加载图片：" + ex.Message,
-                        "图片加载失败",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                }
+                _selectedImagePath = dialog.FileName;
+                LoadImageIntoViewer(_selectedImagePath);
+                ClearResult();
+                lblResultState.Text = "待检测";
+                lblResultState.ForeColor = UiTheme.TextPrimary;
+                lblStatus.Text = _inferenceAvailable
+                    ? "状态：图片已选择，等待检测"
+                    : "状态：图片已选择，但 ONNX 模型尚未就绪";
+                lblStatusFile.Text = "文件：" + Path.GetFileName(_selectedImagePath);
+                UpdateDetectButtonState();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("无法加载图片：" + ex.Message, "图片加载失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void btnDetect_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(_selectedImagePath) ||
-                !File.Exists(_selectedImagePath))
+            if (string.IsNullOrWhiteSpace(_selectedImagePath) || !File.Exists(_selectedImagePath))
             {
-                MessageBox.Show(
-                    "请先选择一张待检测图片。",
-                    "提示",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                MessageBox.Show("请先选择一张待检测图片。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-
             if (!_inferenceAvailable)
             {
-                DisplayError(
-                    "推理服务未配置。请先配置 PythonExecutable 和 InferenceScript。");
+                DisplayError("ONNX 推理服务未就绪。请检查 Engine Directory 和产品模型目录。");
                 return;
             }
-
-            EventHandler handler = DetectRequested;
-            if (handler != null)
-                handler(this, EventArgs.Empty);
+            DetectRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void btnOpenDirectory_Click(object sender, EventArgs e)
         {
             try
             {
-                if (!string.IsNullOrWhiteSpace(_selectedImagePath) &&
-                    File.Exists(_selectedImagePath))
+                if (!string.IsNullOrWhiteSpace(_selectedImagePath) && File.Exists(_selectedImagePath))
                 {
                     Process.Start(new ProcessStartInfo
                     {
@@ -387,11 +349,7 @@ namespace _180Detection
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "无法打开目录：" + ex.Message,
-                    "错误",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                MessageBox.Show("无法打开目录：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -402,9 +360,7 @@ namespace _180Detection
 
         private void cmbProduct_SelectedIndexChanged(object sender, EventArgs e)
         {
-            EventHandler handler = ProductChanged;
-            if (handler != null)
-                handler(this, EventArgs.Empty);
+            ProductChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void LoadImageIntoViewer(string imagePath)
@@ -417,9 +373,7 @@ namespace _180Detection
 
             Image previous = pictureResult.Image;
             pictureResult.Image = loadedImage;
-            if (previous != null)
-                previous.Dispose();
-
+            previous?.Dispose();
             pictureResult.FitToWindow();
             lblViewerHint.Visible = false;
         }
@@ -436,7 +390,7 @@ namespace _180Detection
             lblStatus.Text = "状态：等待图片";
             lblElapsed.Text = "耗时：-- ms";
             lblStatusFile.Text = "文件：--";
-            lblServiceHint.Text = "Python 推理接口已接入 · 等待配置";
+            lblServiceHint.Text = "ONNX Runtime · 等待 Engine / 产品模型";
             lblViewerHint.Visible = true;
             UpdateDetectButtonState();
             UpdateCameraButtonState();
@@ -444,26 +398,15 @@ namespace _180Detection
 
         private void UpdateDetectButtonState()
         {
-            bool hasImage = !string.IsNullOrWhiteSpace(_selectedImagePath) &&
-                            File.Exists(_selectedImagePath);
+            bool hasImage = !string.IsNullOrWhiteSpace(_selectedImagePath) && File.Exists(_selectedImagePath);
             btnDetect.Enabled = !_busy && _inferenceAvailable && hasImage;
-
-            if (btnDetect.Enabled)
-            {
-                btnDetect.BackColor = UiTheme.PrimaryButton;
-                btnDetect.ForeColor = Color.White;
-            }
-            else
-            {
-                btnDetect.BackColor = UiTheme.Disabled;
-                btnDetect.ForeColor = Color.White;
-            }
+            btnDetect.BackColor = btnDetect.Enabled ? UiTheme.PrimaryButton : UiTheme.Disabled;
+            btnDetect.ForeColor = Color.White;
         }
 
         private void UpdateCameraButtonState()
         {
             btnCameraConnect.Enabled = !_busy && !_cameraBusy;
-
             if (!_cameraBusy)
                 btnCameraConnect.Text = _cameraConnected ? "断开相机" : "连接相机";
         }
@@ -473,16 +416,14 @@ namespace _180Detection
             double percent = similarity;
             if (percent >= 0D && percent <= 1D)
                 percent *= 100D;
-
-            return Math.Max(0D, percent).ToString("0.00") + "%";
+            return percent.ToString("0.00") + "%";
         }
 
         private void TabDetection_Disposed(object sender, EventArgs e)
         {
             Image image = pictureResult.Image;
             pictureResult.Image = null;
-            if (image != null)
-                image.Dispose();
+            image?.Dispose();
         }
     }
 }

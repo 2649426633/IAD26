@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -15,7 +14,10 @@ namespace _180Detection
         private readonly Color _activeNavigationColor = UiTheme.NavigationActive;
         private readonly Color _inactiveNavigationColor = UiTheme.Surface;
         private readonly Color _navigationHoverColor = UiTheme.NavigationHover;
-        private InferenceService _inferenceService;
+
+        private readonly AppSettingsService _settingsService;
+        private AppSettings _settings;
+        private OnnxInferenceService _inferenceService;
         private HikCameraService _cameraService;
 
         public TabDetection TabDetectionPage
@@ -27,16 +29,22 @@ namespace _180Detection
         {
             InitializeComponent();
 
-            _inferenceService = InferenceService.FromConfiguration();
-            _cameraService = new HikCameraService();
+            _settingsService = new AppSettingsService();
+            _settings = _settingsService.Load();
+            _inferenceService = new OnnxInferenceService(_settingsService);
+            _cameraService = new HikCameraService(
+                _settingsService.ResolvePath(_settings.HikCameraSdkAssembly));
 
             ConfigureNavigationButtons();
 
             tabDetection.DetectRequested += TabDetection_DetectRequested;
             tabDetection.ProductChanged += TabDetection_ProductChanged;
-            tabDetection.CameraConnectionRequested += TabDetection_CameraConnectionRequested;
-            tabProductConfig.ConfigurationsChanged += TabProductConfig_ConfigurationsChanged;
-            tabSystemSettings.SettingsSaved += TabSystemSettings_SettingsSaved;
+            tabDetection.CameraConnectionRequested +=
+                TabDetection_CameraConnectionRequested;
+            tabProductConfig.ConfigurationsChanged +=
+                TabProductConfig_ConfigurationsChanged;
+            tabSystemSettings.SettingsSaved +=
+                TabSystemSettings_SettingsSaved;
 
             RefreshProductList();
             ShowDetectionPage();
@@ -54,8 +62,8 @@ namespace _180Detection
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            if (_cameraService != null)
-                _cameraService.Dispose();
+            _inferenceService?.Dispose();
+            _cameraService?.Dispose();
             base.OnFormClosed(e);
         }
 
@@ -132,24 +140,37 @@ namespace _180Detection
 
         private void SelectNavigationButton(Button activeButton)
         {
-            Button[] buttons = { btnDetection, btnRecords, btnProduct, btnSettings };
+            Button[] buttons =
+            {
+                btnDetection,
+                btnRecords,
+                btnProduct,
+                btnSettings
+            };
+
             foreach (Button button in buttons)
             {
                 bool active = button == activeButton;
-                button.BackColor = active ? _activeNavigationColor : _inactiveNavigationColor;
-                button.ForeColor = active ? UiTheme.TextPrimary : UiTheme.TextSecondary;
+                button.BackColor =
+                    active ? _activeNavigationColor : _inactiveNavigationColor;
+                button.ForeColor =
+                    active ? UiTheme.TextPrimary : UiTheme.TextSecondary;
                 button.Font = new Font(
                     "Microsoft YaHei UI",
                     9.5F,
                     active ? FontStyle.Bold : FontStyle.Regular);
-                button.FlatAppearance.MouseOverBackColor = active
-                    ? UiTheme.NavigationActive
-                    : UiTheme.NavigationHover;
-                button.FlatAppearance.MouseDownBackColor = UiTheme.NavigationPressed;
+                button.FlatAppearance.MouseOverBackColor =
+                    active
+                        ? UiTheme.NavigationActive
+                        : UiTheme.NavigationHover;
+                button.FlatAppearance.MouseDownBackColor =
+                    UiTheme.NavigationPressed;
             }
         }
 
-        private async void TabDetection_CameraConnectionRequested(object sender, EventArgs e)
+        private async void TabDetection_CameraConnectionRequested(
+            object sender,
+            EventArgs e)
         {
             tabDetection.SetCameraBusy(true);
 
@@ -162,21 +183,27 @@ namespace _180Detection
                     return;
                 }
 
-                string expectedModel = ConfigurationManager.AppSettings["CameraExpectedModel"];
-                if (string.IsNullOrWhiteSpace(expectedModel))
-                    expectedModel = "MV-CS200-10GM";
+                string expectedModel = string.IsNullOrWhiteSpace(
+                    _settings.CameraExpectedModel)
+                    ? "MV-CS200-10GM"
+                    : _settings.CameraExpectedModel.Trim();
 
                 IList<HikCameraDevice> devices =
                     await Task.Run(() => _cameraService.RefreshDevices());
 
                 if (devices == null || devices.Count == 0)
-                    throw new InvalidOperationException(_cameraService.GetStatusText());
+                    throw new InvalidOperationException(
+                        _cameraService.GetStatusText());
 
                 int selectedIndex = -1;
                 for (int i = 0; i < devices.Count; i++)
                 {
-                    string displayName = devices[i].DisplayName ?? string.Empty;
-                    if (displayName.IndexOf(expectedModel, StringComparison.OrdinalIgnoreCase) >= 0)
+                    string displayName =
+                        devices[i].DisplayName ?? string.Empty;
+
+                    if (displayName.IndexOf(
+                        expectedModel,
+                        StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         selectedIndex = i;
                         break;
@@ -191,14 +218,18 @@ namespace _180Detection
 
                     throw new InvalidOperationException(
                         "未找到指定相机 " + expectedModel +
-                        "。当前发现：" + string.Join("，", names.ToArray()));
+                        "。当前发现：" +
+                        string.Join("，", names.ToArray()));
                 }
 
-                await Task.Run(() => _cameraService.Connect(selectedIndex));
+                await Task.Run(
+                    () => _cameraService.Connect(selectedIndex));
 
-                string connectedName = string.IsNullOrWhiteSpace(_cameraService.ConnectedCameraName)
-                    ? expectedModel
-                    : _cameraService.ConnectedCameraName;
+                string connectedName =
+                    string.IsNullOrWhiteSpace(
+                        _cameraService.ConnectedCameraName)
+                        ? expectedModel
+                        : _cameraService.ConnectedCameraName;
 
                 SetCameraStatus(connectedName, true);
             }
@@ -213,37 +244,45 @@ namespace _180Detection
             }
         }
 
-        private async void TabDetection_DetectRequested(object sender, EventArgs e)
+        private async void TabDetection_DetectRequested(
+            object sender,
+            EventArgs e)
         {
-            if (!_inferenceService.IsConfigured)
+            ProductConfig product =
+                tabProductConfig.GetProductByName(
+                    tabDetection.SelectedProduct);
+
+            if (!_inferenceService.CanInspect(product, out string status))
             {
-                string status = _inferenceService.GetConfigurationStatus();
                 tabDetection.DisplayError(
-                    status + "。请先在“系统设置”中配置 Python 解释器和推理脚本。");
+                    status +
+                    "。请检查“系统设置”的 Engine Directory " +
+                    "以及“产品配置”的产品模型目录。");
                 RefreshInferenceStatus();
                 return;
             }
 
             tabDetection.SetBusy(true);
-            SetModelStatus("推理运行中", false);
-            tabDetection.SetModelStatus("推理运行中", false);
+            SetModelStatus("ONNX 推理运行中", false);
+            tabDetection.SetModelStatus("ONNX 推理运行中", false);
 
             try
             {
-                DetectionResult result = await _inferenceService.InspectAsync(
-                    tabDetection.SelectedImagePath,
-                    tabDetection.SelectedProduct);
+                DetectionResult result =
+                    await _inferenceService.InspectAsync(
+                        tabDetection.SelectedImagePath,
+                        product);
 
                 tabDetection.DisplayResult(result);
-                SetModelStatus("模型就绪", true);
-                tabDetection.SetModelStatus("模型就绪", true);
+                SetModelStatus("ONNX 模型就绪", true);
+                tabDetection.SetModelStatus("ONNX 模型就绪", true);
                 tabRecords.RefreshRecords();
             }
             catch (Exception ex)
             {
                 tabDetection.DisplayError(ex.Message);
-                SetModelStatus("推理异常", false);
-                tabDetection.SetModelStatus("推理异常", false);
+                SetModelStatus("ONNX 推理异常", false);
+                tabDetection.SetModelStatus("ONNX 推理异常", false);
             }
             finally
             {
@@ -251,49 +290,72 @@ namespace _180Detection
             }
         }
 
-        private void TabDetection_ProductChanged(object sender, EventArgs e)
+        private void TabDetection_ProductChanged(
+            object sender,
+            EventArgs e)
         {
             SetCurrentProduct(tabDetection.SelectedProduct);
+            RefreshInferenceStatus();
         }
 
-        private void TabProductConfig_ConfigurationsChanged(object sender, EventArgs e)
+        private void TabProductConfig_ConfigurationsChanged(
+            object sender,
+            EventArgs e)
         {
             RefreshProductList();
+            RefreshInferenceStatus();
         }
 
-        private void TabSystemSettings_SettingsSaved(object sender, EventArgs e)
+        private void TabSystemSettings_SettingsSaved(
+            object sender,
+            EventArgs e)
         {
             try
             {
-                if (_cameraService != null)
-                    _cameraService.Dispose();
+                _cameraService?.Dispose();
+                _inferenceService?.Dispose();
 
-                _inferenceService = InferenceService.FromConfiguration();
-                _cameraService = new HikCameraService();
+                _settings = _settingsService.Load();
+                _inferenceService =
+                    new OnnxInferenceService(_settingsService);
+                _cameraService =
+                    new HikCameraService(
+                        _settingsService.ResolvePath(
+                            _settings.HikCameraSdkAssembly));
 
+                RefreshProductList();
                 RefreshInferenceStatus();
                 RefreshCameraStatus();
                 tabRecords.RefreshRecords();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("重新加载运行配置失败：" + ex.Message, "错误",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    "重新加载 ONNX / 设备配置失败：" + ex.Message,
+                    "错误",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
         private void RefreshProductList()
         {
             string selected = tabDetection.SelectedProduct;
-            string[] products = tabProductConfig.GetEnabledProductNames();
+            string[] products =
+                tabProductConfig.GetEnabledProductNames();
+
             tabDetection.SetProducts(products, selected);
             SetCurrentProduct(tabDetection.SelectedProduct);
         }
 
         private void RefreshInferenceStatus()
         {
-            string status = _inferenceService.GetConfigurationStatus();
-            bool configured = _inferenceService.IsConfigured;
+            ProductConfig product =
+                tabProductConfig.GetProductByName(
+                    tabDetection.SelectedProduct);
+
+            bool configured =
+                _inferenceService.CanInspect(product, out string status);
 
             SetCurrentProduct(tabDetection.SelectedProduct);
             SetModelStatus(status, configured);
@@ -305,40 +367,58 @@ namespace _180Detection
         {
             if (_cameraService.IsConnected)
             {
-                SetCameraStatus(_cameraService.ConnectedCameraName, true);
+                SetCameraStatus(
+                    _cameraService.ConnectedCameraName,
+                    true);
                 return;
             }
 
             SetCameraStatus(
-                _cameraService.IsSdkAvailable ? "未连接" : "MVS SDK 未就绪",
+                _cameraService.IsSdkAvailable
+                    ? "未连接"
+                    : "MVS SDK 未就绪",
                 false);
         }
 
         public void SetCurrentProduct(string productName)
         {
-            lblCurrentProduct.Text = "当前产品：" +
-                (string.IsNullOrWhiteSpace(productName) ? "--" : productName.Trim());
+            lblCurrentProduct.Text =
+                "当前产品：" +
+                (string.IsNullOrWhiteSpace(productName)
+                    ? "--"
+                    : productName.Trim());
         }
 
-        public void SetModelStatus(string statusText, bool ready)
+        public void SetModelStatus(
+            string statusText,
+            bool ready)
         {
-            lblModelStatus.Text = (ready ? "● " : "○ ") +
-                (string.IsNullOrWhiteSpace(statusText) ? "模型状态未知" : statusText.Trim());
-            lblModelStatus.ForeColor = ready
-                ? UiTheme.TextPrimary
-                : UiTheme.TextSecondary;
+            lblModelStatus.Text =
+                (ready ? "● " : "○ ") +
+                (string.IsNullOrWhiteSpace(statusText)
+                    ? "ONNX 状态未知"
+                    : statusText.Trim());
+
+            lblModelStatus.ForeColor =
+                ready
+                    ? UiTheme.TextPrimary
+                    : UiTheme.TextSecondary;
         }
 
-        public void SetCameraStatus(string statusText, bool connected)
+        public void SetCameraStatus(
+            string statusText,
+            bool connected)
         {
-            string text = string.IsNullOrWhiteSpace(statusText)
-                ? "未连接"
-                : statusText.Trim();
+            string text =
+                string.IsNullOrWhiteSpace(statusText)
+                    ? "未连接"
+                    : statusText.Trim();
 
             lblCameraStatus.Text = "相机：" + text;
-            lblCameraStatus.ForeColor = connected
-                ? UiTheme.TextPrimary
-                : UiTheme.TextSecondary;
+            lblCameraStatus.ForeColor =
+                connected
+                    ? UiTheme.TextPrimary
+                    : UiTheme.TextSecondary;
 
             tabDetection.SetCameraStatus(text, connected);
         }

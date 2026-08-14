@@ -1,29 +1,39 @@
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.IO;
-using System.Text;
-using System.Web.Script.Serialization;
+using System.Linq;
+using System.Text.Json;
 using _180Detection.Models;
 
 namespace _180Detection.Services
 {
     public sealed class ProductConfigService
     {
-        private readonly JavaScriptSerializer _json = new JavaScriptSerializer();
+        private readonly AppSettingsService _settingsService;
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = true
+        };
 
-        public string ConfigPath { get; private set; }
+        public string ConfigPath
+        {
+            get
+            {
+                AppSettings settings = _settingsService.Load();
+                return _settingsService.ProductConfigPath(settings);
+            }
+        }
 
         public ProductConfigService()
+            : this(new AppSettingsService())
         {
-            string configured = ConfigurationManager.AppSettings["ProductConfigPath"];
-            if (string.IsNullOrWhiteSpace(configured))
-                configured = @"runtime\config\products.json";
+        }
 
-            string expanded = Environment.ExpandEnvironmentVariables(configured.Trim());
-            ConfigPath = Path.IsPathRooted(expanded)
-                ? Path.GetFullPath(expanded)
-                : Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, expanded));
+        public ProductConfigService(AppSettingsService settingsService)
+        {
+            _settingsService = settingsService
+                ?? throw new ArgumentNullException(nameof(settingsService));
         }
 
         public List<ProductConfig> Load()
@@ -31,9 +41,45 @@ namespace _180Detection.Services
             try
             {
                 EnsureDefaultFile();
-                string text = File.ReadAllText(ConfigPath, Encoding.UTF8);
-                List<ProductConfig> products = _json.Deserialize<List<ProductConfig>>(text);
-                return products ?? new List<ProductConfig>();
+                string text = File.ReadAllText(ConfigPath);
+                List<ProductConfig> products =
+                    JsonSerializer.Deserialize<List<ProductConfig>>(text, _jsonOptions);
+
+                if (products == null)
+                    return CreateDefaultProducts();
+
+                bool legacyPythonConfig =
+                    text.IndexOf(
+                        "PatchCoreModelDirectory",
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.IndexOf(
+                        "DefectBankDirectory",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (legacyPythonConfig)
+                {
+                    foreach (ProductConfig product in products)
+                    {
+                        if (product == null)
+                            continue;
+
+                        if (string.IsNullOrWhiteSpace(product.ProductDirectory))
+                        {
+                            product.ProductDirectory = Path.Combine(
+                                "products",
+                                (product.Name ?? string.Empty)
+                                    .Trim()
+                                    .ToLowerInvariant());
+                        }
+
+                        // 旧版 0.5 是占位参数，不自动当作生产标定阈值。
+                        product.AnomalyThreshold = null;
+                    }
+
+                    Save(products);
+                }
+
+                return products;
             }
             catch
             {
@@ -44,7 +90,7 @@ namespace _180Detection.Services
         public void Save(IList<ProductConfig> products)
         {
             if (products == null)
-                throw new ArgumentNullException("products");
+                throw new ArgumentNullException(nameof(products));
 
             List<ProductConfig> normalized = new List<ProductConfig>();
             HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -61,10 +107,8 @@ namespace _180Detection.Services
                 normalized.Add(new ProductConfig
                 {
                     Name = name,
-                    PatchCoreModelDirectory = (source.PatchCoreModelDirectory ?? string.Empty).Trim(),
-                    DefectBankDirectory = (source.DefectBankDirectory ?? string.Empty).Trim(),
-                    AnomalyThreshold = Math.Max(0D, source.AnomalyThreshold),
-                    SimilarityThreshold = Math.Max(0D, source.SimilarityThreshold),
+                    ProductDirectory = (source.ProductDirectory ?? string.Empty).Trim(),
+                    AnomalyThreshold = source.AnomalyThreshold,
                     Enabled = source.Enabled
                 });
             }
@@ -72,26 +116,48 @@ namespace _180Detection.Services
             if (normalized.Count == 0)
                 throw new InvalidOperationException("至少保留一个产品配置。");
 
-            string directory = Path.GetDirectoryName(ConfigPath);
-            if (!Directory.Exists(directory))
-                Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
+            File.WriteAllText(
+                ConfigPath,
+                JsonSerializer.Serialize(normalized, _jsonOptions));
+        }
 
-            File.WriteAllText(ConfigPath, _json.Serialize(normalized), new UTF8Encoding(false));
+        public ProductConfig GetByName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+
+            return Load().FirstOrDefault(p =>
+                p != null &&
+                string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         }
 
         public string[] GetEnabledProductNames()
         {
-            List<string> names = new List<string>();
-            foreach (ProductConfig product in Load())
+            string[] names = Load()
+                .Where(p => p != null && p.Enabled && !string.IsNullOrWhiteSpace(p.Name))
+                .Select(p => p.Name.Trim())
+                .ToArray();
+
+            return names.Length == 0 ? new[] { "Phone" } : names;
+        }
+
+        public string ResolveProductDirectory(ProductConfig product)
+        {
+            if (product == null)
+                return string.Empty;
+
+            AppSettings settings = _settingsService.Load();
+            string configured = product.ProductDirectory;
+
+            if (string.IsNullOrWhiteSpace(configured))
             {
-                if (product != null && product.Enabled && !string.IsNullOrWhiteSpace(product.Name))
-                    names.Add(product.Name.Trim());
+                configured = Path.Combine(
+                    settings.ProductsRoot ?? "products",
+                    (product.Name ?? string.Empty).Trim().ToLowerInvariant());
             }
 
-            if (names.Count == 0)
-                names.Add("Phone");
-
-            return names.ToArray();
+            return _settingsService.ResolvePath(configured);
         }
 
         private void EnsureDefaultFile()
@@ -99,14 +165,10 @@ namespace _180Detection.Services
             if (File.Exists(ConfigPath))
                 return;
 
-            string directory = Path.GetDirectoryName(ConfigPath);
-            if (!Directory.Exists(directory))
-                Directory.CreateDirectory(directory);
-
+            Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
             File.WriteAllText(
                 ConfigPath,
-                _json.Serialize(CreateDefaultProducts()),
-                new UTF8Encoding(false));
+                JsonSerializer.Serialize(CreateDefaultProducts(), _jsonOptions));
         }
 
         private static List<ProductConfig> CreateDefaultProducts()
@@ -116,10 +178,8 @@ namespace _180Detection.Services
                 new ProductConfig
                 {
                     Name = "Phone",
-                    PatchCoreModelDirectory = string.Empty,
-                    DefectBankDirectory = string.Empty,
-                    AnomalyThreshold = 0.5D,
-                    SimilarityThreshold = 0.8D,
+                    ProductDirectory = @"products\phone",
+                    AnomalyThreshold = null,
                     Enabled = true
                 }
             };

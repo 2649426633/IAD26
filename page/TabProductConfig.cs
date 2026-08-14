@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
+using System.IO;
 using System.Windows.Forms;
+using IndustrialAnomaly.Runtime;
 using _180Detection.Models;
 using _180Detection.Services;
 
@@ -9,23 +12,23 @@ namespace _180Detection
 {
     public sealed class TabProductConfig : UserControl
     {
-        private readonly ProductConfigService _service = new ProductConfigService();
+        private readonly AppSettingsService _settingsService = new AppSettingsService();
+        private readonly ProductConfigService _service;
         private readonly List<ProductConfig> _products = new List<ProductConfig>();
-
         private ListBox lstProducts;
         private TextBox txtName;
-        private TextBox txtPatchCore;
-        private TextBox txtDefectBank;
-        private NumericUpDown nudAnomaly;
-        private NumericUpDown nudSimilarity;
+        private TextBox txtProductDirectory;
+        private TextBox txtAnomalyThreshold;
         private CheckBox chkEnabled;
-        private Label lblPath;
+        private Label lblModelInfo;
+        private Label lblConfigPath;
         private Label lblStatus;
 
         public event EventHandler ConfigurationsChanged;
 
         public TabProductConfig()
         {
+            _service = new ProductConfigService(_settingsService);
             Font = new Font("Microsoft YaHei UI", 9F);
             BackColor = UiTheme.WindowBackground;
             Dock = DockStyle.Fill;
@@ -37,14 +40,19 @@ namespace _180Detection
         {
             _products.Clear();
             _products.AddRange(_service.Load());
-
             lstProducts.BeginUpdate();
-            lstProducts.Items.Clear();
-            foreach (ProductConfig product in _products)
-                lstProducts.Items.Add(product.Name);
-            lstProducts.EndUpdate();
+            try
+            {
+                lstProducts.Items.Clear();
+                foreach (ProductConfig product in _products)
+                    lstProducts.Items.Add(product.Name);
+            }
+            finally
+            {
+                lstProducts.EndUpdate();
+            }
 
-            lblPath.Text = "配置文件：" + _service.ConfigPath;
+            lblConfigPath.Text = "配置文件：" + _service.ConfigPath;
             if (lstProducts.Items.Count > 0)
                 lstProducts.SelectedIndex = 0;
             else
@@ -56,17 +64,22 @@ namespace _180Detection
             return _service.GetEnabledProductNames();
         }
 
+        public ProductConfig GetProductByName(string name)
+        {
+            return _service.GetByName(name);
+        }
+
         private void BuildUi()
         {
-            TableLayoutPanel root = new TableLayoutPanel();
-            root.BackColor = UiTheme.WindowBackground;
-            root.ColumnCount = 2;
+            TableLayoutPanel root = new TableLayoutPanel
+            {
+                BackColor = UiTheme.WindowBackground,
+                ColumnCount = 2,
+                RowCount = 1,
+                Dock = DockStyle.Fill
+            };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300F));
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            root.RowCount = 1;
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            root.Dock = DockStyle.Fill;
-
             root.Controls.Add(BuildListPanel(), 0, 0);
             root.Controls.Add(BuildEditorPanel(), 1, 0);
             Controls.Add(root);
@@ -76,31 +89,18 @@ namespace _180Detection
         {
             Panel panel = CreatePanel(new Padding(12));
             panel.Margin = new Padding(0, 0, 8, 0);
-
-            TableLayoutPanel layout = new TableLayoutPanel();
-            layout.ColumnCount = 1;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.RowCount = 4;
+            TableLayoutPanel layout = new TableLayoutPanel { ColumnCount = 1, RowCount = 4, Dock = DockStyle.Fill };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            layout.Dock = DockStyle.Fill;
+            layout.Controls.Add(CreateTitle("产品列表"), 0, 0);
 
-            Label title = CreateTitle("产品列表");
-            layout.Controls.Add(title, 0, 0);
-
-            lstProducts = new ListBox();
-            lstProducts.BorderStyle = BorderStyle.FixedSingle;
-            lstProducts.Dock = DockStyle.Fill;
-            lstProducts.Font = new Font("Microsoft YaHei UI", 9F);
+            lstProducts = new ListBox { BorderStyle = BorderStyle.FixedSingle, Dock = DockStyle.Fill };
             lstProducts.SelectedIndexChanged += lstProducts_SelectedIndexChanged;
             layout.Controls.Add(lstProducts, 0, 1);
 
-            FlowLayoutPanel actions = new FlowLayoutPanel();
-            actions.Dock = DockStyle.Fill;
-            actions.FlowDirection = FlowDirection.LeftToRight;
-            actions.WrapContents = false;
+            FlowLayoutPanel actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
             Button add = CreateButton("新增产品", false);
             Button delete = CreateButton("删除", false);
             add.Click += btnAdd_Click;
@@ -109,14 +109,15 @@ namespace _180Detection
             actions.Controls.Add(delete);
             layout.Controls.Add(actions, 0, 2);
 
-            lblPath = new Label();
-            lblPath.AutoEllipsis = true;
-            lblPath.Dock = DockStyle.Fill;
-            lblPath.ForeColor = UiTheme.TextMuted;
-            lblPath.Font = new Font("Microsoft YaHei UI", 8F);
-            lblPath.TextAlign = ContentAlignment.MiddleLeft;
-            layout.Controls.Add(lblPath, 0, 3);
-
+            lblConfigPath = new Label
+            {
+                AutoEllipsis = true,
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei UI", 8F),
+                ForeColor = UiTheme.TextMuted,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            layout.Controls.Add(lblConfigPath, 0, 3);
             panel.Controls.Add(layout);
             return panel;
         }
@@ -124,75 +125,72 @@ namespace _180Detection
         private Control BuildEditorPanel()
         {
             Panel panel = CreatePanel(new Padding(18));
-
-            TableLayoutPanel root = new TableLayoutPanel();
-            root.ColumnCount = 1;
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            root.RowCount = 3;
+            TableLayoutPanel root = new TableLayoutPanel { ColumnCount = 1, RowCount = 4, Dock = DockStyle.Fill };
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 250F));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
-            root.Dock = DockStyle.Fill;
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
+            root.Controls.Add(CreateTitle("ONNX 产品模型"), 0, 0);
 
-            root.Controls.Add(CreateTitle("产品参数"), 0, 0);
-
-            TableLayoutPanel form = new TableLayoutPanel();
-            form.ColumnCount = 3;
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145F));
+            TableLayoutPanel form = new TableLayoutPanel { ColumnCount = 3, RowCount = 4, Dock = DockStyle.Fill };
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
             form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            form.RowCount = 7;
-            for (int i = 0; i < 7; i++)
-                form.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
-            form.Dock = DockStyle.Top;
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+            for (int i = 0; i < 4; i++)
+                form.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
 
             txtName = CreateTextBox();
-            txtPatchCore = CreateTextBox();
-            txtDefectBank = CreateTextBox();
-            nudAnomaly = CreateNumber(0.5M);
-            nudSimilarity = CreateNumber(0.8M);
-            chkEnabled = new CheckBox();
-            chkEnabled.Text = "启用此产品";
-            chkEnabled.Checked = true;
-            chkEnabled.Dock = DockStyle.Fill;
-            chkEnabled.ForeColor = UiTheme.TextPrimary;
+            txtProductDirectory = CreateTextBox();
+            txtAnomalyThreshold = CreateTextBox();
+            txtAnomalyThreshold.PlaceholderText = "留空 = 未标定";
+            chkEnabled = new CheckBox { Text = "启用此产品", Dock = DockStyle.Fill, Checked = true };
 
             AddFormRow(form, 0, "产品名称", txtName, null);
-            Button browsePatch = CreateButton("浏览...", false);
-            browsePatch.Click += delegate { BrowseFolder(txtPatchCore); };
-            AddFormRow(form, 1, "PatchCore 模型目录", txtPatchCore, browsePatch);
-
-            Button browseDefect = CreateButton("浏览...", false);
-            browseDefect.Click += delegate { BrowseFolder(txtDefectBank); };
-            AddFormRow(form, 2, "Defect Bank 目录", txtDefectBank, browseDefect);
-            AddFormRow(form, 3, "异常阈值", nudAnomaly, null);
-            AddFormRow(form, 4, "分类相似度阈值", nudSimilarity, null);
-            AddFormRow(form, 5, "状态", chkEnabled, null);
-
-            Label hint = new Label();
-            hint.Dock = DockStyle.Fill;
-            hint.ForeColor = UiTheme.TextMuted;
-            hint.Text = "这里只保存推理配置，不提供训练入口。产品保存后会立即同步到“检测工作台”的产品下拉框。";
-            hint.TextAlign = ContentAlignment.MiddleLeft;
-            form.Controls.Add(hint, 0, 6);
-            form.SetColumnSpan(hint, 3);
-
+            Button browse = CreateButton("浏览...", false);
+            browse.Click += delegate { BrowseFolder(txtProductDirectory); };
+            AddFormRow(form, 1, "产品模型目录", txtProductDirectory, browse);
+            AddFormRow(form, 2, "PASS/NG 阈值", txtAnomalyThreshold, null);
+            AddFormRow(form, 3, "状态", chkEnabled, null);
             root.Controls.Add(form, 0, 1);
 
-            FlowLayoutPanel footer = new FlowLayoutPanel();
-            footer.Dock = DockStyle.Fill;
-            footer.FlowDirection = FlowDirection.RightToLeft;
+            Panel infoPanel = new Panel
+            {
+                BackColor = UiTheme.SurfaceSoft,
+                BorderStyle = BorderStyle.FixedSingle,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(14)
+            };
+            lblModelInfo = new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Consolas", 9F),
+                ForeColor = UiTheme.TextSecondary,
+                Text = "选择产品后检查 product_model.json / 三个 bin 文件。"
+            };
+            infoPanel.Controls.Add(lblModelInfo);
+            root.Controls.Add(infoPanel, 0, 2);
+
+            TableLayoutPanel footer = new TableLayoutPanel { ColumnCount = 3, Dock = DockStyle.Fill };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
+            lblStatus = new Label
+            {
+                AutoEllipsis = true,
+                Dock = DockStyle.Fill,
+                ForeColor = UiTheme.TextSecondary,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            Button validate = CreateButton("模型自检", false);
             Button save = CreateButton("保存配置", true);
+            validate.Margin = new Padding(6, 10, 0, 10);
+            save.Margin = new Padding(6, 10, 0, 10);
+            validate.Click += delegate { RefreshModelInfo(true); };
             save.Click += btnSave_Click;
-            lblStatus = new Label();
-            lblStatus.AutoSize = false;
-            lblStatus.Width = 420;
-            lblStatus.Dock = DockStyle.Left;
-            lblStatus.ForeColor = UiTheme.TextSecondary;
-            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
-            footer.Controls.Add(save);
-            footer.Controls.Add(lblStatus);
-            root.Controls.Add(footer, 0, 2);
+            footer.Controls.Add(lblStatus, 0, 0);
+            footer.Controls.Add(validate, 1, 0);
+            footer.Controls.Add(save, 2, 0);
+            root.Controls.Add(footer, 0, 3);
 
             panel.Controls.Add(root);
             return panel;
@@ -209,12 +207,13 @@ namespace _180Detection
 
             ProductConfig product = _products[index];
             txtName.Text = product.Name ?? string.Empty;
-            txtPatchCore.Text = product.PatchCoreModelDirectory ?? string.Empty;
-            txtDefectBank.Text = product.DefectBankDirectory ?? string.Empty;
-            nudAnomaly.Value = ClampDecimal(product.AnomalyThreshold);
-            nudSimilarity.Value = ClampDecimal(product.SimilarityThreshold);
+            txtProductDirectory.Text = product.ProductDirectory ?? string.Empty;
+            txtAnomalyThreshold.Text = product.AnomalyThreshold.HasValue
+                ? product.AnomalyThreshold.Value.ToString("0.######", CultureInfo.InvariantCulture)
+                : string.Empty;
             chkEnabled.Checked = product.Enabled;
             lblStatus.Text = string.Empty;
+            RefreshModelInfo(false);
         }
 
         private void btnAdd_Click(object sender, EventArgs e)
@@ -222,23 +221,20 @@ namespace _180Detection
             string baseName = "NewProduct";
             string name = baseName;
             int suffix = 1;
-            while (_products.Exists(delegate(ProductConfig p)
-            {
-                return string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase);
-            }))
+            while (_products.Exists(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
             {
                 suffix++;
                 name = baseName + suffix;
             }
 
-            _products.Add(new ProductConfig
+            ProductConfig product = new ProductConfig
             {
                 Name = name,
-                AnomalyThreshold = 0.5D,
-                SimilarityThreshold = 0.8D,
+                ProductDirectory = Path.Combine("products", name.ToLowerInvariant()),
+                AnomalyThreshold = null,
                 Enabled = true
-            });
-
+            };
+            _products.Add(product);
             lstProducts.Items.Add(name);
             lstProducts.SelectedIndex = lstProducts.Items.Count - 1;
         }
@@ -248,17 +244,16 @@ namespace _180Detection
             int index = lstProducts.SelectedIndex;
             if (index < 0)
                 return;
-
             if (_products.Count <= 1)
             {
-                MessageBox.Show("至少保留一个产品配置。", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("至少保留一个产品配置。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-
-            string name = _products[index].Name;
-            if (MessageBox.Show("确定删除产品“" + name + "”吗？", "确认删除",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (MessageBox.Show(
+                "确定删除产品“" + _products[index].Name + "”吗？\r\n这里只删除 IAD26 配置，不删除产品模型目录。",
+                "确认删除",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
             _products.RemoveAt(index);
@@ -271,46 +266,84 @@ namespace _180Detection
             int index = lstProducts.SelectedIndex;
             if (index < 0 || index >= _products.Count)
                 return;
-
             if (string.IsNullOrWhiteSpace(txtName.Text))
             {
-                MessageBox.Show("产品名称不能为空。", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("产品名称不能为空。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
+            }
+
+            double? threshold = null;
+            string thresholdText = (txtAnomalyThreshold.Text ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(thresholdText))
+            {
+                if (!double.TryParse(thresholdText, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) || parsed < 0D)
+                {
+                    MessageBox.Show("PASS/NG 阈值必须是非负数字，或留空表示“未标定”。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                threshold = parsed;
             }
 
             ProductConfig product = _products[index];
             product.Name = txtName.Text.Trim();
-            product.PatchCoreModelDirectory = txtPatchCore.Text.Trim();
-            product.DefectBankDirectory = txtDefectBank.Text.Trim();
-            product.AnomalyThreshold = (double)nudAnomaly.Value;
-            product.SimilarityThreshold = (double)nudSimilarity.Value;
+            product.ProductDirectory = txtProductDirectory.Text.Trim();
+            product.AnomalyThreshold = threshold;
             product.Enabled = chkEnabled.Checked;
 
             try
             {
                 _service.Save(_products);
+                string selectedName = product.Name;
                 ReloadConfigurations();
-
                 for (int i = 0; i < lstProducts.Items.Count; i++)
                 {
-                    if (string.Equals(lstProducts.Items[i].ToString(), product.Name,
-                        StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(lstProducts.Items[i].ToString(), selectedName, StringComparison.OrdinalIgnoreCase))
                     {
                         lstProducts.SelectedIndex = i;
                         break;
                     }
                 }
-
-                lblStatus.Text = "已保存，检测工作台产品列表已同步。";
-                EventHandler handler = ConfigurationsChanged;
-                if (handler != null)
-                    handler(this, EventArgs.Empty);
+                lblStatus.Text = "已保存 · 检测工作台产品列表已同步";
+                ConfigurationsChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("保存失败：" + ex.Message, "错误",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("保存失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RefreshModelInfo(bool showDialog)
+        {
+            int index = lstProducts.SelectedIndex;
+            if (index < 0 || index >= _products.Count)
+                return;
+            try
+            {
+                ProductConfig temp = new ProductConfig
+                {
+                    Name = txtName.Text.Trim(),
+                    ProductDirectory = txtProductDirectory.Text.Trim(),
+                    AnomalyThreshold = _products[index].AnomalyThreshold,
+                    Enabled = chkEnabled.Checked
+                };
+                string directory = _service.ResolveProductDirectory(temp);
+                ProductModel model = ProductModel.Load(directory);
+                lblModelInfo.Text =
+                    "状态：可用\r\n" +
+                    "目录：" + directory + "\r\n" +
+                    "产品：" + model.Manifest.ProductName + "\r\n" +
+                    "类别：" + string.Join(", ", model.Manifest.Classes) + "\r\n" +
+                    "Memory Rows：" + model.Manifest.PatchCoreMemoryRows + "\r\n" +
+                    "Memory Strategy：" + model.Manifest.PatchCoreMemoryStrategy + "\r\n" +
+                    "BBox Threshold：" + model.Manifest.BboxRelativeThreshold.ToString("0.###");
+                if (showDialog)
+                    MessageBox.Show("产品模型自检通过。", "模型自检", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                lblModelInfo.Text = "状态：不可用\r\n" + ex.Message;
+                if (showDialog)
+                    MessageBox.Show(ex.Message, "模型自检失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -319,76 +352,47 @@ namespace _180Detection
             if (txtName == null)
                 return;
             txtName.Text = string.Empty;
-            txtPatchCore.Text = string.Empty;
-            txtDefectBank.Text = string.Empty;
-            nudAnomaly.Value = 0.5M;
-            nudSimilarity.Value = 0.8M;
+            txtProductDirectory.Text = string.Empty;
+            txtAnomalyThreshold.Text = string.Empty;
             chkEnabled.Checked = true;
-        }
-
-        private static decimal ClampDecimal(double value)
-        {
-            decimal result;
-            try { result = (decimal)value; }
-            catch { result = 0M; }
-            if (result < 0M) return 0M;
-            if (result > 1000M) return 1000M;
-            return result;
+            lblModelInfo.Text = "--";
         }
 
         private static void BrowseFolder(TextBox target)
         {
-            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
-            {
+            using FolderBrowserDialog dialog = new FolderBrowserDialog();
+            if (Directory.Exists(target.Text))
                 dialog.SelectedPath = target.Text;
-                if (dialog.ShowDialog() == DialogResult.OK)
-                    target.Text = dialog.SelectedPath;
-            }
+            if (dialog.ShowDialog() == DialogResult.OK)
+                target.Text = dialog.SelectedPath;
         }
 
         private static Panel CreatePanel(Padding padding)
         {
-            Panel panel = new Panel();
-            panel.BackColor = UiTheme.Surface;
-            panel.BorderStyle = BorderStyle.FixedSingle;
-            panel.Dock = DockStyle.Fill;
-            panel.Padding = padding;
-            return panel;
+            return new Panel { BackColor = UiTheme.Surface, BorderStyle = BorderStyle.FixedSingle, Dock = DockStyle.Fill, Padding = padding };
         }
 
         private static Label CreateTitle(string text)
         {
-            Label label = new Label();
-            label.Dock = DockStyle.Fill;
-            label.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
-            label.ForeColor = UiTheme.TextPrimary;
-            label.Text = text;
-            label.TextAlign = ContentAlignment.MiddleLeft;
-            return label;
+            return new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+                ForeColor = UiTheme.TextPrimary,
+                Text = text,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
         }
 
         private static TextBox CreateTextBox()
         {
-            TextBox text = new TextBox();
-            text.BorderStyle = BorderStyle.FixedSingle;
-            text.Dock = DockStyle.Fill;
-            text.Font = new Font("Microsoft YaHei UI", 9F);
-            text.Margin = new Padding(0, 10, 8, 10);
-            return text;
-        }
-
-        private static NumericUpDown CreateNumber(decimal value)
-        {
-            NumericUpDown number = new NumericUpDown();
-            number.DecimalPlaces = 4;
-            number.Increment = 0.01M;
-            number.Minimum = 0M;
-            number.Maximum = 1000M;
-            number.Value = value;
-            number.Dock = DockStyle.Left;
-            number.Width = 180;
-            number.Margin = new Padding(0, 10, 0, 10);
-            return number;
+            return new TextBox
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei UI", 9F),
+                Margin = new Padding(0, 11, 8, 11)
+            };
         }
 
         private static Button CreateButton(string text, bool primary)
@@ -397,25 +401,18 @@ namespace _180Detection
             button.BackColor = primary ? UiTheme.PrimaryButton : UiTheme.Surface;
             button.ForeColor = primary ? Color.White : UiTheme.TextPrimary;
             button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = primary ? UiTheme.PrimaryButton : UiTheme.BorderStrong;
             button.FlatAppearance.BorderSize = 1;
-            button.Font = new Font("Microsoft YaHei UI", 8.5F,
-                primary ? FontStyle.Bold : FontStyle.Regular);
-            button.Height = 30;
-            button.Width = primary ? 96 : 86;
-            button.Margin = new Padding(4, 5, 4, 5);
+            button.FlatAppearance.BorderColor = primary ? UiTheme.PrimaryButton : UiTheme.BorderStrong;
+            button.Font = new Font("Microsoft YaHei UI", 8.5F, primary ? FontStyle.Bold : FontStyle.Regular);
+            button.Size = new Size(96, 30);
             button.Text = text;
+            button.UseVisualStyleBackColor = false;
             return button;
         }
 
-        private static void AddFormRow(TableLayoutPanel form, int row, string caption,
-            Control editor, Control action)
+        private static void AddFormRow(TableLayoutPanel form, int row, string caption, Control editor, Control action)
         {
-            Label label = new Label();
-            label.Dock = DockStyle.Fill;
-            label.ForeColor = UiTheme.TextSecondary;
-            label.Text = caption;
-            label.TextAlign = ContentAlignment.MiddleLeft;
+            Label label = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.TextSecondary, Text = caption, TextAlign = ContentAlignment.MiddleLeft };
             form.Controls.Add(label, 0, row);
             form.Controls.Add(editor, 1, row);
             if (action != null)

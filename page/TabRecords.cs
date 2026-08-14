@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Web.Script.Serialization;
+using System.Text.Json;
 using System.Windows.Forms;
+using _180Detection.Services;
 
 namespace _180Detection
 {
@@ -16,20 +16,20 @@ namespace _180Detection
         private sealed class RecordItem
         {
             public DateTime Time;
-            public string Product;
-            public string Status;
-            public string Defect;
+            public string Product = string.Empty;
+            public string Status = string.Empty;
+            public string Defect = string.Empty;
             public double Score;
             public double Similarity;
+            public double Margin;
             public long Elapsed;
-            public string ImagePath;
-            public string MarkedPath;
-            public string JsonPath;
+            public string ImagePath = string.Empty;
+            public string MarkedPath = string.Empty;
+            public string JsonPath = string.Empty;
         }
 
-        private readonly JavaScriptSerializer _json = new JavaScriptSerializer();
+        private readonly AppSettingsService _settingsService = new AppSettingsService();
         private readonly List<RecordItem> _all = new List<RecordItem>();
-
         private TextBox txtKeyword;
         private ComboBox cmbStatus;
         private ComboBox cmbRange;
@@ -48,14 +48,12 @@ namespace _180Detection
         public void RefreshRecords()
         {
             _all.Clear();
-            string directory = ResolveResultDirectory();
-            lblDirectory.Text = "结果目录：" + directory;
-
+            var settings = _settingsService.Load();
+            string directory = _settingsService.RecordsRoot(settings);
+            lblDirectory.Text = "记录目录：" + directory;
             if (Directory.Exists(directory))
             {
-                string[] files = Directory.GetFiles(
-                    directory, "*.json", SearchOption.TopDirectoryOnly);
-
+                string[] files = Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories);
                 foreach (string file in files.OrderByDescending(File.GetLastWriteTime))
                 {
                     RecordItem item = TryRead(file);
@@ -63,22 +61,15 @@ namespace _180Detection
                         _all.Add(item);
                 }
             }
-
             ApplyFilter();
         }
 
         private void BuildUi()
         {
-            TableLayoutPanel root = new TableLayoutPanel();
-            root.BackColor = UiTheme.WindowBackground;
-            root.ColumnCount = 1;
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            root.RowCount = 3;
+            TableLayoutPanel root = new TableLayoutPanel { BackColor = UiTheme.WindowBackground, ColumnCount = 1, RowCount = 3, Dock = DockStyle.Fill };
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
-            root.Dock = DockStyle.Fill;
-
             root.Controls.Add(BuildToolbar(), 0, 0);
             root.Controls.Add(BuildGridPanel(), 0, 1);
             root.Controls.Add(BuildFooter(), 0, 2);
@@ -87,139 +78,87 @@ namespace _180Detection
 
         private Control BuildToolbar()
         {
-            Panel panel = new Panel();
-            panel.BackColor = UiTheme.Surface;
-            panel.BorderStyle = BorderStyle.FixedSingle;
-            panel.Dock = DockStyle.Fill;
-            panel.Padding = new Padding(10, 6, 10, 6);
-            panel.Margin = new Padding(0, 0, 0, 8);
-
-            FlowLayoutPanel flow = new FlowLayoutPanel();
-            flow.Dock = DockStyle.Fill;
-            flow.WrapContents = false;
-
+            Panel panel = new Panel { BackColor = UiTheme.Surface, BorderStyle = BorderStyle.FixedSingle, Dock = DockStyle.Fill, Padding = new Padding(10, 6, 10, 6), Margin = new Padding(0, 0, 0, 8) };
+            FlowLayoutPanel flow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
             flow.Controls.Add(CreateCaption("关键字"));
-            txtKeyword = new TextBox();
-            txtKeyword.Width = 190;
-            txtKeyword.Margin = new Padding(0, 3, 14, 3);
+            txtKeyword = new TextBox { Width = 190, Margin = new Padding(0, 3, 14, 3) };
             txtKeyword.TextChanged += delegate { ApplyFilter(); };
             flow.Controls.Add(txtKeyword);
-
             flow.Controls.Add(CreateCaption("结果"));
-            cmbStatus = new ComboBox();
-            cmbStatus.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbStatus.Items.AddRange(new object[] { "全部", "PASS", "NG" });
+            cmbStatus = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 130, Margin = new Padding(0, 2, 14, 2) };
+            cmbStatus.Items.AddRange(new object[] { "全部", "PASS", "NG", "UNCALIBRATED" });
             cmbStatus.SelectedIndex = 0;
-            cmbStatus.Width = 100;
-            cmbStatus.Margin = new Padding(0, 2, 14, 2);
             cmbStatus.SelectedIndexChanged += delegate { ApplyFilter(); };
             flow.Controls.Add(cmbStatus);
-
             flow.Controls.Add(CreateCaption("时间"));
-            cmbRange = new ComboBox();
-            cmbRange.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbRange = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110, Margin = new Padding(0, 2, 14, 2) };
             cmbRange.Items.AddRange(new object[] { "全部", "今天", "最近7天", "最近30天" });
             cmbRange.SelectedIndex = 0;
-            cmbRange.Width = 110;
-            cmbRange.Margin = new Padding(0, 2, 14, 2);
             cmbRange.SelectedIndexChanged += delegate { ApplyFilter(); };
             flow.Controls.Add(cmbRange);
-
-            Button refresh = CreateButton("刷新", false);
-            Button openImage = CreateButton("打开结果图", false);
-            Button openFolder = CreateButton("打开目录", false);
+            Button refresh = CreateButton("刷新");
+            Button openImage = CreateButton("打开结果图");
+            Button openFolder = CreateButton("打开目录");
             refresh.Click += delegate { RefreshRecords(); };
-            openImage.Click += btnOpenImage_Click;
-            openFolder.Click += btnOpenFolder_Click;
+            openImage.Click += delegate { OpenSelectedImage(); };
+            openFolder.Click += delegate { OpenSelectedFolder(); };
             flow.Controls.Add(refresh);
             flow.Controls.Add(openImage);
             flow.Controls.Add(openFolder);
-
             panel.Controls.Add(flow);
             return panel;
         }
 
         private Control BuildGridPanel()
         {
-            Panel panel = new Panel();
-            panel.BackColor = UiTheme.Surface;
-            panel.BorderStyle = BorderStyle.FixedSingle;
-            panel.Dock = DockStyle.Fill;
-            panel.Padding = new Padding(0);
-
-            grid = new DataGridView();
-            grid.AllowUserToAddRows = false;
-            grid.AllowUserToDeleteRows = false;
-            grid.AllowUserToResizeRows = false;
-            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            grid.BackgroundColor = UiTheme.Surface;
-            grid.BorderStyle = BorderStyle.None;
-            grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            Panel panel = new Panel { BackColor = UiTheme.Surface, BorderStyle = BorderStyle.FixedSingle, Dock = DockStyle.Fill };
+            grid = new DataGridView
+            {
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                BackgroundColor = UiTheme.Surface,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
+                Dock = DockStyle.Fill,
+                EnableHeadersVisualStyles = false,
+                MultiSelect = false,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            };
             grid.ColumnHeadersDefaultCellStyle.BackColor = UiTheme.SurfaceSoft;
             grid.ColumnHeadersDefaultCellStyle.ForeColor = UiTheme.TextPrimary;
-            grid.ColumnHeadersDefaultCellStyle.Font =
-                new Font("Microsoft YaHei UI", 8.5F, FontStyle.Bold);
+            grid.ColumnHeadersDefaultCellStyle.Font = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Bold);
             grid.DefaultCellStyle.BackColor = UiTheme.Surface;
             grid.DefaultCellStyle.ForeColor = UiTheme.TextPrimary;
             grid.DefaultCellStyle.SelectionBackColor = UiTheme.NavigationActive;
             grid.DefaultCellStyle.SelectionForeColor = UiTheme.TextPrimary;
-            grid.Dock = DockStyle.Fill;
-            grid.EnableHeadersVisualStyles = false;
-            grid.MultiSelect = false;
-            grid.ReadOnly = true;
-            grid.RowHeadersVisible = false;
             grid.RowTemplate.Height = 32;
-            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             grid.CellDoubleClick += delegate { OpenSelectedImage(); };
-
             grid.Columns.Add("time", "检测时间");
             grid.Columns.Add("status", "结果");
             grid.Columns.Add("product", "产品");
             grid.Columns.Add("defect", "异常类型");
             grid.Columns.Add("score", "PatchCore Score");
             grid.Columns.Add("similarity", "相似度");
+            grid.Columns.Add("margin", "Margin");
             grid.Columns.Add("elapsed", "耗时(ms)");
             grid.Columns.Add("file", "文件名");
-
-            grid.Columns["time"].FillWeight = 125;
-            grid.Columns["status"].FillWeight = 55;
-            grid.Columns["product"].FillWeight = 80;
-            grid.Columns["defect"].FillWeight = 90;
-            grid.Columns["score"].FillWeight = 85;
-            grid.Columns["similarity"].FillWeight = 70;
-            grid.Columns["elapsed"].FillWeight = 70;
-            grid.Columns["file"].FillWeight = 150;
-
             panel.Controls.Add(grid);
             return panel;
         }
 
         private Control BuildFooter()
         {
-            Panel panel = new Panel();
-            panel.BackColor = UiTheme.Surface;
-            panel.Dock = DockStyle.Fill;
-            panel.Margin = new Padding(0, 8, 0, 0);
-
-            TableLayoutPanel layout = new TableLayoutPanel();
-            layout.ColumnCount = 2;
+            Panel panel = new Panel { BackColor = UiTheme.Surface, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
+            TableLayoutPanel layout = new TableLayoutPanel { ColumnCount = 2, Dock = DockStyle.Fill, Padding = new Padding(10, 0, 10, 0) };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55F));
-            layout.Dock = DockStyle.Fill;
-            layout.Padding = new Padding(10, 0, 10, 0);
-
-            lblSummary = new Label();
-            lblSummary.Dock = DockStyle.Fill;
-            lblSummary.ForeColor = UiTheme.TextSecondary;
-            lblSummary.TextAlign = ContentAlignment.MiddleLeft;
-
-            lblDirectory = new Label();
-            lblDirectory.AutoEllipsis = true;
-            lblDirectory.Dock = DockStyle.Fill;
-            lblDirectory.ForeColor = UiTheme.TextMuted;
-            lblDirectory.TextAlign = ContentAlignment.MiddleRight;
-
+            lblSummary = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.TextSecondary, TextAlign = ContentAlignment.MiddleLeft };
+            lblDirectory = new Label { AutoEllipsis = true, Dock = DockStyle.Fill, ForeColor = UiTheme.TextMuted, TextAlign = ContentAlignment.MiddleRight };
             layout.Controls.Add(lblSummary, 0, 0);
             layout.Controls.Add(lblDirectory, 1, 0);
             panel.Controls.Add(layout);
@@ -230,283 +169,203 @@ namespace _180Detection
         {
             if (grid == null)
                 return;
-
             string keyword = (txtKeyword.Text ?? string.Empty).Trim();
-            string status = cmbStatus.SelectedItem == null
-                ? "全部" : cmbStatus.SelectedItem.ToString();
+            string status = cmbStatus.SelectedItem == null ? "全部" : cmbStatus.SelectedItem.ToString();
             DateTime minTime = DateTime.MinValue;
+            string range = cmbRange.SelectedItem == null ? "全部" : cmbRange.SelectedItem.ToString();
+            if (range == "今天") minTime = DateTime.Today;
+            else if (range == "最近7天") minTime = DateTime.Now.AddDays(-7);
+            else if (range == "最近30天") minTime = DateTime.Now.AddDays(-30);
 
-            string range = cmbRange.SelectedItem == null
-                ? "全部" : cmbRange.SelectedItem.ToString();
-            if (range == "今天")
-                minTime = DateTime.Today;
-            else if (range == "最近7天")
-                minTime = DateTime.Now.AddDays(-7);
-            else if (range == "最近30天")
-                minTime = DateTime.Now.AddDays(-30);
-
-            List<RecordItem> filtered = new List<RecordItem>();
-            foreach (RecordItem item in _all)
-            {
-                if (item.Time < minTime)
-                    continue;
-                if (status != "全部" &&
-                    !string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (!string.IsNullOrWhiteSpace(keyword))
-                {
-                    string haystack = (item.Product + " " + item.Defect + " " +
-                        item.ImagePath + " " + item.MarkedPath).ToLowerInvariant();
-                    if (haystack.IndexOf(keyword.ToLowerInvariant(), StringComparison.Ordinal) < 0)
-                        continue;
-                }
-                filtered.Add(item);
-            }
+            List<RecordItem> filtered = _all
+                .Where(item => item.Time >= minTime)
+                .Where(item => status == "全部" || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.IsNullOrWhiteSpace(keyword) ||
+                    (item.Product + " " + item.Defect + " " + item.ImagePath + " " + item.MarkedPath)
+                    .IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderByDescending(item => item.Time)
+                .ToList();
 
             grid.Rows.Clear();
-            int ok = 0;
-            int ng = 0;
-            foreach (RecordItem item in filtered.OrderByDescending(r => r.Time))
+            foreach (RecordItem item in filtered)
             {
-                int index = grid.Rows.Add(
+                int row = grid.Rows.Add(
                     item.Time.ToString("yyyy-MM-dd HH:mm:ss"),
-                    item.Status,
-                    string.IsNullOrWhiteSpace(item.Product) ? "--" : item.Product,
+                    DisplayStatus(item.Status),
+                    item.Product,
                     string.IsNullOrWhiteSpace(item.Defect) ? "--" : item.Defect,
-                    item.Score.ToString("0.0000", CultureInfo.InvariantCulture),
+                    item.Score.ToString("0.000000"),
                     FormatSimilarity(item.Similarity),
+                    item.Margin.ToString("0.0000"),
                     item.Elapsed.ToString(CultureInfo.InvariantCulture),
-                    Path.GetFileName(string.IsNullOrWhiteSpace(item.ImagePath)
-                        ? item.JsonPath : item.ImagePath));
-                grid.Rows[index].Tag = item;
-
-                if (item.Status == "NG") ng++;
-                else if (item.Status == "PASS") ok++;
+                    Path.GetFileName(string.IsNullOrWhiteSpace(item.ImagePath) ? item.JsonPath : item.ImagePath));
+                grid.Rows[row].Tag = item;
             }
 
-            lblSummary.Text = "记录：" + filtered.Count + "   PASS：" + ok + "   NG：" + ng;
+            int ng = filtered.Count(x => string.Equals(x.Status, "NG", StringComparison.OrdinalIgnoreCase));
+            int pass = filtered.Count(x => string.Equals(x.Status, "PASS", StringComparison.OrdinalIgnoreCase));
+            int uncalibrated = filtered.Count(x => string.Equals(x.Status, "UNCALIBRATED", StringComparison.OrdinalIgnoreCase));
+            lblSummary.Text = "共 " + filtered.Count + " 条 · PASS " + pass + " · NG " + ng + " · 未标定 " + uncalibrated;
         }
 
-        private RecordItem TryRead(string jsonPath)
+        private static RecordItem TryRead(string file)
         {
             try
             {
-                object parsed = _json.DeserializeObject(File.ReadAllText(jsonPath));
-                Dictionary<string, object> root = parsed as Dictionary<string, object>;
-                if (root == null)
-                    return null;
-
-                Dictionary<string, object> data = root;
-                object nested;
-                if (root.TryGetValue("result", out nested))
-                {
-                    Dictionary<string, object> nestedResult =
-                        nested as Dictionary<string, object>;
-                    if (nestedResult != null)
-                        data = nestedResult;
-                }
-
-                string status = GetString(data, "status", "result_status", "decision");
-                object ng = GetValue(data, "is_ng", "isNg", "IsNg");
-                bool isNg = ng != null
-                    ? ToBool(ng)
-                    : string.Equals(status, "NG", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(status, "FAIL", StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(status, "ANOMALY", StringComparison.OrdinalIgnoreCase);
-
-                string product = GetString(root, "_ui_product", "product", "product_name");
-                if (string.IsNullOrWhiteSpace(product))
-                    product = GetString(data, "product", "product_name");
-
-                DateTime time = File.GetLastWriteTime(jsonPath);
-                string timeText = GetString(root, "_ui_record_time", "record_time", "timestamp");
-                DateTime parsedTime;
-                if (DateTime.TryParse(timeText, out parsedTime))
-                    time = parsedTime;
-
-                string image = GetString(root, "_ui_image_path");
-                if (string.IsNullOrWhiteSpace(image))
-                    image = GetString(data, "image_path", "imagePath", "ImagePath", "image");
-
-                string marked = GetString(root, "_ui_marked_image_path");
-                if (string.IsNullOrWhiteSpace(marked))
-                    marked = GetString(data,
-                        "marked_image_path", "markedImagePath", "MarkedImagePath", "marked");
+                using JsonDocument document = JsonDocument.Parse(File.ReadAllText(file));
+                JsonElement root = document.RootElement;
+                if (TryGet(root, "result", out JsonElement nested) && nested.ValueKind == JsonValueKind.Object)
+                    root = nested;
 
                 return new RecordItem
                 {
-                    Time = time,
-                    Product = product,
-                    Status = isNg ? "NG" : "PASS",
-                    Defect = isNg
-                        ? GetString(data, "defect_class", "defectClass", "class_name", "class")
-                        : "Normal",
-                    Score = GetDouble(data,
-                        "anomaly_score", "anomalyScore", "patchcore_score", "score"),
-                    Similarity = GetDouble(data,
-                        "similarity", "dino_similarity", "classification_similarity"),
-                    Elapsed = GetLong(data,
-                        "elapsed_ms", "elapsedMilliseconds", "duration_ms"),
-                    ImagePath = ResolveRecordPath(image, jsonPath),
-                    MarkedPath = ResolveRecordPath(marked, jsonPath),
-                    JsonPath = jsonPath
+                    Time = GetDateTime(root, File.GetLastWriteTime(file), "record_time", "timestamp", "time"),
+                    Product = GetString(root, "product", "product_name"),
+                    Status = GetStatus(root),
+                    Defect = GetString(root, "defect_class", "predicted_known_defect", "predicted_defect", "class_name"),
+                    Score = GetDouble(root, "anomaly_score", "patchcore_anomaly_score", "patchcore_score", "score"),
+                    Similarity = GetDouble(root, "similarity", "top1_similarity", "classification_similarity"),
+                    Margin = GetDouble(root, "margin"),
+                    Elapsed = GetLong(root, "elapsed_ms", "elapsedMilliseconds", "duration_ms"),
+                    ImagePath = GetString(root, "image_path", "source_image_path", "image"),
+                    MarkedPath = GetString(root, "marked_image_path", "full_marked_image", "marked"),
+                    JsonPath = file
                 };
             }
-            catch
-            {
-                return null;
-            }
+            catch { return null; }
         }
 
-        private void btnOpenImage_Click(object sender, EventArgs e)
+        private static string GetStatus(JsonElement root)
         {
-            OpenSelectedImage();
+            string status = GetString(root, "status", "anomaly_decision", "decision");
+            if (!string.IsNullOrWhiteSpace(status))
+                return status.ToUpperInvariant();
+            if (TryGet(root, "is_ng", out JsonElement ng))
+            {
+                if (ng.ValueKind == JsonValueKind.True) return "NG";
+                if (ng.ValueKind == JsonValueKind.False) return "PASS";
+            }
+            string final = GetString(root, "final_result");
+            if (final.StartsWith("NG", StringComparison.OrdinalIgnoreCase)) return "NG";
+            if (string.Equals(final, "PASS", StringComparison.OrdinalIgnoreCase)) return "PASS";
+            return "UNCALIBRATED";
         }
 
         private void OpenSelectedImage()
         {
-            RecordItem item = GetSelected();
-            if (item == null)
-                return;
-
-            string path = File.Exists(item.MarkedPath) ? item.MarkedPath : item.ImagePath;
+            RecordItem item = SelectedItem();
+            if (item == null) return;
+            string path = !string.IsNullOrWhiteSpace(item.MarkedPath) && File.Exists(item.MarkedPath) ? item.MarkedPath : item.ImagePath;
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
-                MessageBox.Show("该记录对应的图像文件不存在。", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("记录对应的图像不存在。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = path,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("无法打开图像：" + ex.Message, "错误",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
         }
 
-        private void btnOpenFolder_Click(object sender, EventArgs e)
+        private void OpenSelectedFolder()
         {
-            string directory = ResolveResultDirectory();
-            Directory.CreateDirectory(directory);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = directory,
-                UseShellExecute = true
-            });
+            RecordItem item = SelectedItem();
+            if (item == null || string.IsNullOrWhiteSpace(item.JsonPath) || !File.Exists(item.JsonPath)) return;
+            Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = "/select,\"" + item.JsonPath + "\"", UseShellExecute = true });
         }
 
-        private RecordItem GetSelected()
+        private RecordItem SelectedItem()
         {
-            if (grid.SelectedRows.Count == 0)
-                return null;
+            if (grid.SelectedRows.Count == 0) return null;
             return grid.SelectedRows[0].Tag as RecordItem;
         }
 
-        private static Label CreateCaption(string text)
+        private static bool TryGet(JsonElement root, string name, out JsonElement value)
         {
-            Label label = new Label();
-            label.AutoSize = true;
-            label.ForeColor = UiTheme.TextSecondary;
-            label.Margin = new Padding(0, 8, 8, 0);
-            label.Text = text;
-            return label;
-        }
-
-        private static Button CreateButton(string text, bool primary)
-        {
-            Button button = new Button();
-            button.BackColor = primary ? UiTheme.PrimaryButton : UiTheme.Surface;
-            button.ForeColor = primary ? Color.White : UiTheme.TextPrimary;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor =
-                primary ? UiTheme.PrimaryButton : UiTheme.BorderStrong;
-            button.FlatAppearance.BorderSize = 1;
-            button.Font = new Font("Microsoft YaHei UI", 8.5F);
-            button.Height = 30;
-            button.Width = text.Length > 3 ? 92 : 72;
-            button.Margin = new Padding(4, 2, 4, 2);
-            button.Text = text;
-            return button;
-        }
-
-        private static string ResolveResultDirectory()
-        {
-            string configured = ConfigurationManager.AppSettings["InferenceResultDirectory"];
-            if (string.IsNullOrWhiteSpace(configured))
-                configured = @"runtime\results";
-
-            string expanded = Environment.ExpandEnvironmentVariables(configured.Trim());
-            return Path.IsPathRooted(expanded)
-                ? Path.GetFullPath(expanded)
-                : Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, expanded));
-        }
-
-        private static string ResolveRecordPath(string value, string jsonPath)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return string.Empty;
-            if (Path.IsPathRooted(value))
-                return value;
-            return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(jsonPath), value));
-        }
-
-        private static object GetValue(Dictionary<string, object> values, params string[] keys)
-        {
-            foreach (string key in keys)
+            if (root.ValueKind == JsonValueKind.Object)
             {
-                object value;
-                if (values.TryGetValue(key, out value))
-                    return value;
+                foreach (JsonProperty property in root.EnumerateObject())
+                {
+                    if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        value = property.Value;
+                        return true;
+                    }
+                }
             }
-            return null;
+            value = default;
+            return false;
         }
 
-        private static string GetString(Dictionary<string, object> values, params string[] keys)
+        private static string GetString(JsonElement root, params string[] names)
         {
-            object value = GetValue(values, keys);
-            return value == null ? string.Empty : Convert.ToString(value, CultureInfo.InvariantCulture);
+            foreach (string name in names)
+            {
+                if (!TryGet(root, name, out JsonElement value)) continue;
+                if (value.ValueKind == JsonValueKind.String) return value.GetString() ?? string.Empty;
+                if (value.ValueKind != JsonValueKind.Null && value.ValueKind != JsonValueKind.Undefined) return value.ToString();
+            }
+            return string.Empty;
         }
 
-        private static double GetDouble(Dictionary<string, object> values, params string[] keys)
+        private static double GetDouble(JsonElement root, params string[] names)
         {
-            object value = GetValue(values, keys);
-            if (value == null) return 0D;
-            try { return Convert.ToDouble(value, CultureInfo.InvariantCulture); }
-            catch { return 0D; }
+            foreach (string name in names)
+            {
+                if (!TryGet(root, name, out JsonElement value)) continue;
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out double number)) return number;
+                if (double.TryParse(value.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)) return number;
+            }
+            return 0D;
         }
 
-        private static long GetLong(Dictionary<string, object> values, params string[] keys)
+        private static long GetLong(JsonElement root, params string[] names)
         {
-            object value = GetValue(values, keys);
-            if (value == null) return 0L;
-            try { return Convert.ToInt64(value, CultureInfo.InvariantCulture); }
-            catch { return 0L; }
+            foreach (string name in names)
+            {
+                if (!TryGet(root, name, out JsonElement value)) continue;
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out long number)) return number;
+                if (long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out number)) return number;
+            }
+            return 0L;
         }
 
-        private static bool ToBool(object value)
+        private static DateTime GetDateTime(JsonElement root, DateTime fallback, params string[] names)
         {
-            if (value is bool) return (bool)value;
-            string text = Convert.ToString(value, CultureInfo.InvariantCulture);
-            return text == "1" ||
-                string.Equals(text, "true", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(text, "ng", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(text, "anomaly", StringComparison.OrdinalIgnoreCase);
+            string text = GetString(root, names);
+            if (DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime value))
+                return value.ToLocalTime();
+            return fallback;
+        }
+
+        private static string DisplayStatus(string status)
+        {
+            return string.Equals(status, "UNCALIBRATED", StringComparison.OrdinalIgnoreCase) ? "未标定" : status;
         }
 
         private static string FormatSimilarity(double similarity)
         {
-            double value = similarity;
-            if (value >= 0D && value <= 1D)
-                value *= 100D;
-            return value.ToString("0.00", CultureInfo.InvariantCulture) + "%";
+            double percent = similarity;
+            if (percent >= 0D && percent <= 1D) percent *= 100D;
+            return percent.ToString("0.00") + "%";
+        }
+
+        private static Label CreateCaption(string text)
+        {
+            return new Label { AutoSize = true, ForeColor = UiTheme.TextSecondary, Margin = new Padding(0, 7, 8, 0), Text = text };
+        }
+
+        private static Button CreateButton(string text)
+        {
+            Button button = new Button();
+            button.BackColor = UiTheme.Surface;
+            button.ForeColor = UiTheme.TextPrimary;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 1;
+            button.FlatAppearance.BorderColor = UiTheme.BorderStrong;
+            button.Font = new Font("Microsoft YaHei UI", 8.5F);
+            button.Margin = new Padding(6, 0, 0, 0);
+            button.Size = new Size(96, 30);
+            button.Text = text;
+            button.UseVisualStyleBackColor = false;
+            return button;
         }
     }
 }
