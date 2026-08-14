@@ -12,9 +12,12 @@ namespace _180Detection
         private string _selectedImagePath;
         private bool _inferenceAvailable;
         private bool _busy;
+        private bool _cameraBusy;
+        private bool _cameraConnected;
 
         public event EventHandler DetectRequested;
         public event EventHandler ProductChanged;
+        public event EventHandler CameraConnectionRequested;
 
         public string SelectedImagePath
         {
@@ -40,6 +43,7 @@ namespace _180Detection
             cmbProduct.SelectedIndex = 0;
             Disposed += TabDetection_Disposed;
             SetWaitingState();
+            SetCameraStatus("未连接", false);
         }
 
         public void SetProducts(string[] products, string selectedProduct)
@@ -118,6 +122,65 @@ namespace _180Detection
                 : UiTheme.TextSecondary;
         }
 
+        public void SetCameraStatus(string text, bool connected)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<string, bool>(SetCameraStatus), text, connected);
+                return;
+            }
+
+            _cameraConnected = connected;
+
+            string status = string.IsNullOrWhiteSpace(text)
+                ? "未连接"
+                : text.Trim();
+
+            lblCameraState.Text = (connected ? "● " : "○ ") + status;
+            lblCameraState.ForeColor = connected
+                ? UiTheme.TextPrimary
+                : UiTheme.TextMuted;
+
+            btnCameraConnect.Text = connected ? "断开相机" : "连接相机";
+            UpdateCameraButtonState();
+        }
+
+        public void SetCameraBusy(bool busy)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<bool>(SetCameraBusy), busy);
+                return;
+            }
+
+            _cameraBusy = busy;
+            UpdateCameraButtonState();
+
+            if (busy)
+            {
+                btnCameraConnect.Text = "处理中...";
+                lblCameraState.Text = "○ 正在搜索/连接相机";
+            }
+        }
+
+        public void ShowCameraError(string message)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<string>(ShowCameraError), message);
+                return;
+            }
+
+            lblCameraState.Text = "○ 相机连接失败";
+            lblCameraState.ForeColor = UiTheme.TextSecondary;
+
+            MessageBox.Show(
+                string.IsNullOrWhiteSpace(message) ? "相机连接失败。" : message,
+                "海康相机",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+
         public void SetBusy(bool busy)
         {
             if (InvokeRequired)
@@ -130,8 +193,9 @@ namespace _180Detection
             cmbProduct.Enabled = !busy;
             btnChooseImage.Enabled = !busy;
             btnOpenDirectory.Enabled = !busy;
-            btnDetect.Text = busy ? "检测中..." : "检测";
+            btnDetect.Text = busy ? "检测中..." : "开始检测";
             UpdateDetectButtonState();
+            UpdateCameraButtonState();
 
             if (busy)
             {
@@ -226,6 +290,13 @@ namespace _180Detection
                 ? "--"
                 : Path.GetFileName(_selectedImagePath);
             lblElapsed.Text = "耗时：-- ms";
+        }
+
+        private void btnCameraConnect_Click(object sender, EventArgs e)
+        {
+            EventHandler handler = CameraConnectionRequested;
+            if (handler != null)
+                handler(this, EventArgs.Empty);
         }
 
         private void btnChooseImage_Click(object sender, EventArgs e)
@@ -368,6 +439,7 @@ namespace _180Detection
             lblServiceHint.Text = "Python 推理接口已接入 · 等待配置";
             lblViewerHint.Visible = true;
             UpdateDetectButtonState();
+            UpdateCameraButtonState();
         }
 
         private void UpdateDetectButtonState()
@@ -386,6 +458,14 @@ namespace _180Detection
                 btnDetect.BackColor = UiTheme.Disabled;
                 btnDetect.ForeColor = Color.White;
             }
+        }
+
+        private void UpdateCameraButtonState()
+        {
+            btnCameraConnect.Enabled = !_busy && !_cameraBusy;
+
+            if (!_cameraBusy)
+                btnCameraConnect.Text = _cameraConnected ? "断开相机" : "连接相机";
         }
 
         private static string FormatSimilarity(double similarity)
