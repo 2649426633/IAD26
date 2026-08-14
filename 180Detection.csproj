@@ -15,6 +15,15 @@
   <ItemGroup>
     <Compile Remove="Properties\Settings.Designer.cs" />
     <Compile Remove="service\InferenceService.cs" />
+    <Compile Remove="page\TabMain.cs" />
+    <Compile Remove="page\TabMain.Designer.cs" />
+    <Compile Remove="page\TabTemplate.cs" />
+    <Compile Remove="page\TabTemplate.Designer.cs" />
+    <Compile Remove="page\TabAnalysis.cs" />
+    <Compile Remove="page\TabAnalysis.Designer.cs" />
+    <EmbeddedResource Remove="page\TabMain.resx" />
+    <EmbeddedResource Remove="page\TabTemplate.resx" />
+    <EmbeddedResource Remove="page\TabAnalysis.resx" />
   </ItemGroup>
 
   <ItemGroup>
