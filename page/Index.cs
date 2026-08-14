@@ -8,9 +8,9 @@ namespace _180Detection
 {
     public partial class Index : Form
     {
-        private readonly Color _activeNavigationColor = UiTheme.SidebarActive;
-        private readonly Color _inactiveNavigationColor = UiTheme.Sidebar;
-        private readonly Color _navigationHoverColor = UiTheme.SidebarHover;
+        private readonly Color _activeNavigationColor = UiTheme.NavigationActive;
+        private readonly Color _inactiveNavigationColor = UiTheme.Surface;
+        private readonly Color _navigationHoverColor = UiTheme.NavigationHover;
         private readonly InferenceService _inferenceService;
 
         public TabDetection TabDetectionPage
@@ -93,7 +93,6 @@ namespace _180Detection
         private void ShowDetectionPage()
         {
             SelectNavigationButton(btnDetection);
-            lblPageTitle.Text = "检测工作台";
             placeholderPage.Visible = false;
             tabDetection.Visible = true;
             tabDetection.BringToFront();
@@ -102,7 +101,6 @@ namespace _180Detection
         private void ShowPlaceholderPage(Button selectedButton, string title, string description)
         {
             SelectNavigationButton(selectedButton);
-            lblPageTitle.Text = title;
             lblPlaceholderTitle.Text = title;
             lblPlaceholderDescription.Text = description;
             tabDetection.Visible = false;
@@ -117,17 +115,15 @@ namespace _180Detection
             {
                 bool active = button == activeButton;
                 button.BackColor = active ? _activeNavigationColor : _inactiveNavigationColor;
-                button.ForeColor = active ? UiTheme.TextPrimary : Color.White;
+                button.ForeColor = active ? UiTheme.TextPrimary : UiTheme.TextSecondary;
                 button.Font = new Font(
                     "Microsoft YaHei UI",
-                    10.5F,
+                    9.5F,
                     active ? FontStyle.Bold : FontStyle.Regular);
                 button.FlatAppearance.MouseOverBackColor = active
-                    ? Color.FromArgb(245, 245, 245)
-                    : UiTheme.SidebarHover;
-                button.FlatAppearance.MouseDownBackColor = active
-                    ? Color.FromArgb(232, 232, 232)
-                    : UiTheme.SidebarHover;
+                    ? UiTheme.NavigationActive
+                    : UiTheme.NavigationHover;
+                button.FlatAppearance.MouseDownBackColor = UiTheme.NavigationPressed;
             }
         }
 

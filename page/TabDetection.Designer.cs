@@ -39,9 +39,9 @@ namespace _180Detection
             panelToolbar = new Panel();
             cmbProduct = new ComboBox();
             lblModelState = new Label();
-            btnChooseImage = CreateToolbarButton("选择图片", 112, false);
-            btnDetect = CreateToolbarButton("检测", 90, true);
-            btnOpenDirectory = CreateToolbarButton("打开目录", 112, false);
+            btnChooseImage = CreateToolbarButton("选择图片", 96, false);
+            btnDetect = CreateToolbarButton("开始检测", 96, true);
+            btnOpenDirectory = CreateToolbarButton("打开目录", 96, false);
             pictureResult = new SmoothZoomPictureBox();
             lblViewerHint = new Label();
             btnFitImage = CreateToolbarButton("适应窗口", 82, false);
@@ -84,9 +84,9 @@ namespace _180Detection
             rootLayout.ColumnCount = 1;
             rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             rootLayout.RowCount = 3;
-            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
             rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
             rootLayout.Dock = DockStyle.Fill;
             rootLayout.Margin = Padding.Empty;
             rootLayout.Controls.Add(panelToolbar, 0, 0);
@@ -95,43 +95,44 @@ namespace _180Detection
         private void BuildToolbar()
         {
             panelToolbar.BackColor = UiTheme.Surface;
-            panelToolbar.BorderStyle = BorderStyle.FixedSingle;
             panelToolbar.Dock = DockStyle.Fill;
-            panelToolbar.Margin = new Padding(0, 0, 0, 12);
-            panelToolbar.Padding = new Padding(16, 8, 12, 8);
+            panelToolbar.Margin = new Padding(0, 0, 0, 8);
 
             TableLayoutPanel layout = new TableLayoutPanel();
+            layout.BackColor = UiTheme.Surface;
             layout.ColumnCount = 2;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
             layout.Dock = DockStyle.Fill;
             layout.Margin = Padding.Empty;
+            layout.Padding = new Padding(12, 6, 10, 5);
 
             FlowLayoutPanel productFlow = new FlowLayoutPanel();
+            productFlow.BackColor = UiTheme.Surface;
             productFlow.Dock = DockStyle.Fill;
             productFlow.Margin = Padding.Empty;
             productFlow.WrapContents = false;
 
             Label productCaption = new Label();
             productCaption.AutoSize = true;
-            productCaption.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
-            productCaption.ForeColor = UiTheme.TextPrimary;
+            productCaption.Font = new Font("Microsoft YaHei UI", 9F);
+            productCaption.ForeColor = UiTheme.TextSecondary;
             productCaption.Margin = new Padding(0, 7, 8, 0);
             productCaption.Text = "产品";
 
             cmbProduct.BackColor = Color.White;
             cmbProduct.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbProduct.FlatStyle = FlatStyle.Flat;
-            cmbProduct.Font = new Font("Microsoft YaHei UI", 9.5F);
+            cmbProduct.Font = new Font("Microsoft YaHei UI", 9F);
             cmbProduct.ForeColor = UiTheme.TextPrimary;
             cmbProduct.Margin = new Padding(0, 2, 18, 0);
-            cmbProduct.Size = new Size(164, 29);
+            cmbProduct.Size = new Size(156, 28);
             cmbProduct.SelectedIndexChanged +=
                 new System.EventHandler(cmbProduct_SelectedIndexChanged);
 
             lblModelState.AutoSize = true;
-            lblModelState.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
-            lblModelState.ForeColor = UiTheme.TextSecondary;
+            lblModelState.Font = new Font("Microsoft YaHei UI", 8.5F);
+            lblModelState.ForeColor = UiTheme.TextMuted;
             lblModelState.Margin = new Padding(0, 7, 0, 0);
             lblModelState.Text = "○ 推理脚本未配置";
 
@@ -139,20 +140,23 @@ namespace _180Detection
                 new Control[] { productCaption, cmbProduct, lblModelState });
 
             FlowLayoutPanel actionFlow = new FlowLayoutPanel();
+            actionFlow.BackColor = UiTheme.Surface;
             actionFlow.Dock = DockStyle.Fill;
             actionFlow.FlowDirection = FlowDirection.RightToLeft;
             actionFlow.Margin = Padding.Empty;
             actionFlow.WrapContents = false;
 
-            btnOpenDirectory.Margin = new Padding(8, 1, 0, 0);
-            btnDetect.Margin = new Padding(8, 1, 0, 0);
-            btnChooseImage.Margin = new Padding(8, 1, 0, 0);
+            btnOpenDirectory.Margin = new Padding(6, 0, 0, 0);
+            btnDetect.Margin = new Padding(6, 0, 0, 0);
+            btnChooseImage.Margin = new Padding(6, 0, 0, 0);
+
             btnOpenDirectory.Click +=
                 new System.EventHandler(btnOpenDirectory_Click);
             btnDetect.Click +=
                 new System.EventHandler(btnDetect_Click);
             btnChooseImage.Click +=
                 new System.EventHandler(btnChooseImage_Click);
+
             actionFlow.Controls.AddRange(
                 new Control[] { btnOpenDirectory, btnDetect, btnChooseImage });
 
@@ -167,144 +171,163 @@ namespace _180Detection
             main.BackColor = UiTheme.WindowBackground;
             main.ColumnCount = 2;
             main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            main.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 350F));
+            main.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 320F));
             main.RowCount = 1;
             main.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             main.Dock = DockStyle.Fill;
             main.Margin = Padding.Empty;
-            main.Controls.Add(BuildViewerCard(), 0, 0);
-            main.Controls.Add(BuildResultCard(), 1, 0);
+            main.Controls.Add(BuildViewerPanel(), 0, 0);
+            main.Controls.Add(BuildResultPanel(), 1, 0);
             rootLayout.Controls.Add(main, 0, 1);
         }
 
-        private Control BuildViewerCard()
+        private Control BuildViewerPanel()
         {
-            Panel card = new Panel();
-            card.BackColor = UiTheme.Surface;
-            card.BorderStyle = BorderStyle.FixedSingle;
-            card.Dock = DockStyle.Fill;
-            card.Margin = new Padding(0, 0, 12, 0);
+            Panel panel = new Panel();
+            panel.BackColor = UiTheme.Surface;
+            panel.BorderStyle = BorderStyle.FixedSingle;
+            panel.Dock = DockStyle.Fill;
+            panel.Margin = new Padding(0, 0, 8, 0);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.BackColor = UiTheme.Surface;
+            layout.ColumnCount = 1;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.RowCount = 2;
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            layout.Dock = DockStyle.Fill;
+            layout.Margin = Padding.Empty;
 
             Panel header = new Panel();
             header.BackColor = UiTheme.Surface;
-            header.Dock = DockStyle.Top;
-            header.Height = 46;
+            header.Dock = DockStyle.Fill;
 
             Label title = new Label();
             title.AutoSize = true;
-            title.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+            title.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
             title.ForeColor = UiTheme.TextPrimary;
-            title.Location = new Point(14, 12);
-            title.Text = "最终检测结果";
+            title.Location = new Point(12, 10);
+            title.Text = "检测图像";
 
             Label subtitle = new Label();
             subtitle.AutoSize = true;
-            subtitle.Font = new Font("Microsoft YaHei UI", 8.5F);
+            subtitle.Font = new Font("Microsoft YaHei UI", 8F);
             subtitle.ForeColor = UiTheme.TextMuted;
-            subtitle.Location = new Point(130, 14);
-            subtitle.Text = "滚轮缩放 · 中键拖动 · 双击复位";
+            subtitle.Location = new Point(88, 11);
+            subtitle.Text = "滚轮缩放 / 中键拖动 / 双击复位";
 
             btnFitImage.Dock = DockStyle.Right;
-            btnFitImage.Width = 92;
+            btnFitImage.Width = 88;
             btnFitImage.Click += new System.EventHandler(btnFitImage_Click);
+
             header.Controls.AddRange(new Control[] { title, subtitle, btnFitImage });
 
             Panel viewport = new Panel();
             viewport.BackColor = UiTheme.Viewer;
             viewport.Dock = DockStyle.Fill;
-            viewport.Padding = new Padding(10);
+            viewport.Margin = Padding.Empty;
+            viewport.Padding = new Padding(6);
 
             pictureResult.BackColor = UiTheme.Viewer;
             pictureResult.Dock = DockStyle.Fill;
 
             lblViewerHint.BackColor = Color.Transparent;
             lblViewerHint.Dock = DockStyle.Fill;
-            lblViewerHint.Font = new Font("Microsoft YaHei UI", 12F);
+            lblViewerHint.Font = new Font("Microsoft YaHei UI", 10F);
             lblViewerHint.ForeColor = UiTheme.ViewerText;
             lblViewerHint.Text =
-                "选择图片后在此显示检测结果\r\n仅显示 Python 最终生成的 marked 图片";
+                "请选择待检测图片\r\n检测后仅显示最终 marked 结果";
             lblViewerHint.TextAlign = ContentAlignment.MiddleCenter;
 
             viewport.Controls.Add(pictureResult);
             viewport.Controls.Add(lblViewerHint);
-            card.Controls.Add(viewport);
-            card.Controls.Add(header);
-            return card;
+            layout.Controls.Add(header, 0, 0);
+            layout.Controls.Add(viewport, 0, 1);
+            panel.Controls.Add(layout);
+            return panel;
         }
 
-        private Control BuildResultCard()
+        private Control BuildResultPanel()
         {
-            Panel card = new Panel();
-            card.BackColor = UiTheme.Surface;
-            card.BorderStyle = BorderStyle.FixedSingle;
-            card.Dock = DockStyle.Fill;
-            card.Margin = Padding.Empty;
-            card.Padding = new Padding(18, 12, 18, 12);
+            Panel panel = new Panel();
+            panel.BackColor = UiTheme.Surface;
+            panel.BorderStyle = BorderStyle.FixedSingle;
+            panel.Dock = DockStyle.Fill;
+            panel.Margin = Padding.Empty;
 
             TableLayoutPanel grid = new TableLayoutPanel();
+            grid.BackColor = UiTheme.Surface;
             grid.ColumnCount = 2;
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112F));
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            grid.RowCount = 9;
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
+            grid.RowCount = 10;
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 74F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
             grid.Dock = DockStyle.Fill;
+            grid.Padding = new Padding(14, 0, 14, 0);
 
             Label title = new Label();
             title.Dock = DockStyle.Fill;
-            title.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
+            title.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
             title.ForeColor = UiTheme.TextPrimary;
             title.Text = "检测结果";
             title.TextAlign = ContentAlignment.MiddleLeft;
 
             lblResultState.Dock = DockStyle.Fill;
-            lblResultState.Font = new Font("Microsoft YaHei UI", 28F, FontStyle.Bold);
+            lblResultState.Font = new Font("Microsoft YaHei UI", 23F, FontStyle.Bold);
             lblResultState.ForeColor = UiTheme.TextSecondary;
             lblResultState.Text = "--";
-            lblResultState.TextAlign = ContentAlignment.MiddleCenter;
+            lblResultState.TextAlign = ContentAlignment.MiddleLeft;
+
+            Panel separator = new Panel();
+            separator.BackColor = UiTheme.Border;
+            separator.Dock = DockStyle.Fill;
+            separator.Margin = Padding.Empty;
 
             grid.Controls.Add(title, 0, 0);
             grid.SetColumnSpan(title, 2);
             grid.Controls.Add(lblResultState, 0, 1);
             grid.SetColumnSpan(lblResultState, 2);
-            AddResultRow(grid, 2, "异常类型", lblDefectValue);
-            AddResultRow(grid, 3, "PatchCore Score", lblScoreValue);
-            AddResultRow(grid, 4, "分类相似度", lblSimilarityValue);
-            AddResultRow(grid, 5, "检测时间", lblTimeValue);
-            AddResultRow(grid, 6, "文件名", lblFileValue);
+            grid.Controls.Add(separator, 0, 2);
+            grid.SetColumnSpan(separator, 2);
+
+            AddResultRow(grid, 3, "异常类型", lblDefectValue);
+            AddResultRow(grid, 4, "PatchCore Score", lblScoreValue);
+            AddResultRow(grid, 5, "分类相似度", lblSimilarityValue);
+            AddResultRow(grid, 6, "检测时间", lblTimeValue);
+            AddResultRow(grid, 7, "文件名", lblFileValue);
 
             lblServiceHint.AutoEllipsis = true;
             lblServiceHint.Dock = DockStyle.Fill;
-            lblServiceHint.Font = new Font("Microsoft YaHei UI", 8.5F);
+            lblServiceHint.Font = new Font("Microsoft YaHei UI", 8F);
             lblServiceHint.ForeColor = UiTheme.TextMuted;
-            lblServiceHint.Padding = new Padding(4);
-            lblServiceHint.Text =
-                "Python 推理接口已接入 · 等待配置";
-            lblServiceHint.TextAlign = ContentAlignment.MiddleCenter;
-            grid.Controls.Add(lblServiceHint, 0, 8);
+            lblServiceHint.Text = "Python 推理接口已接入";
+            lblServiceHint.TextAlign = ContentAlignment.MiddleLeft;
+            grid.Controls.Add(lblServiceHint, 0, 9);
             grid.SetColumnSpan(lblServiceHint, 2);
 
-            card.Controls.Add(grid);
-            return card;
+            panel.Controls.Add(grid);
+            return panel;
         }
 
         private void BuildStatusBar()
         {
             Panel status = new Panel();
             status.BackColor = UiTheme.Surface;
-            status.BorderStyle = BorderStyle.FixedSingle;
             status.Dock = DockStyle.Fill;
-            status.Margin = new Padding(0, 12, 0, 0);
-            status.Padding = new Padding(14, 0, 14, 0);
+            status.Margin = new Padding(0, 8, 0, 0);
 
             TableLayoutPanel layout = new TableLayoutPanel();
+            layout.BackColor = UiTheme.Surface;
             layout.ColumnCount = 3;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
@@ -312,6 +335,7 @@ namespace _180Detection
             layout.RowCount = 1;
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layout.Dock = DockStyle.Fill;
+            layout.Padding = new Padding(10, 0, 10, 0);
             layout.Controls.Add(lblStatus, 0, 0);
             layout.Controls.Add(lblElapsed, 1, 0);
             layout.Controls.Add(lblStatusFile, 2, 0);
@@ -328,19 +352,19 @@ namespace _180Detection
             button.FlatAppearance.BorderSize = 1;
             button.FlatAppearance.BorderColor = primary
                 ? UiTheme.PrimaryButton
-                : UiTheme.Border;
+                : UiTheme.BorderStrong;
             button.FlatAppearance.MouseOverBackColor = primary
                 ? UiTheme.PrimaryButtonHover
-                : Color.FromArgb(245, 245, 245);
+                : UiTheme.NavigationHover;
             button.FlatAppearance.MouseDownBackColor = primary
-                ? Color.Black
-                : Color.FromArgb(232, 232, 232);
+                ? Color.FromArgb(30, 30, 30)
+                : UiTheme.NavigationPressed;
             button.Font = new Font(
                 "Microsoft YaHei UI",
-                9F,
+                8.5F,
                 primary ? FontStyle.Bold : FontStyle.Regular);
             button.ForeColor = primary ? Color.White : UiTheme.TextPrimary;
-            button.Size = new Size(width, 34);
+            button.Size = new Size(width, 30);
             button.Text = text;
             button.UseVisualStyleBackColor = false;
             return button;
@@ -352,8 +376,8 @@ namespace _180Detection
             label.AutoEllipsis = true;
             label.Dock = DockStyle.Fill;
             label.Font = monospace
-                ? new Font("Consolas", 11F, FontStyle.Bold)
-                : new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+                ? new Font("Consolas", 10F, FontStyle.Regular)
+                : new Font("Microsoft YaHei UI", 9F, FontStyle.Regular);
             label.ForeColor = UiTheme.TextPrimary;
             label.Text = "--";
             label.TextAlign = ContentAlignment.MiddleRight;
@@ -365,7 +389,7 @@ namespace _180Detection
             Label label = new Label();
             label.AutoEllipsis = true;
             label.Dock = DockStyle.Fill;
-            label.Font = new Font("Microsoft YaHei UI", 8.5F);
+            label.Font = new Font("Microsoft YaHei UI", 8F);
             label.ForeColor = UiTheme.TextSecondary;
             label.TextAlign = alignment;
             return label;
@@ -379,7 +403,7 @@ namespace _180Detection
         {
             Label label = new Label();
             label.Dock = DockStyle.Fill;
-            label.Font = new Font("Microsoft YaHei UI", 9.5F);
+            label.Font = new Font("Microsoft YaHei UI", 8.5F);
             label.ForeColor = UiTheme.TextSecondary;
             label.Text = caption;
             label.TextAlign = ContentAlignment.MiddleLeft;

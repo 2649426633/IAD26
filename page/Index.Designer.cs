@@ -8,10 +8,8 @@ namespace _180Detection
         private System.ComponentModel.IContainer components = null;
         private TableLayoutPanel rootLayout;
         private Panel panelHeader;
-        private Panel panelSidebar;
         private Panel panelContent;
         private Label lblBrand;
-        private Label lblPageTitle;
         private Label lblCurrentProduct;
         private Label lblModelStatus;
         private Button btnDetection;
@@ -36,16 +34,14 @@ namespace _180Detection
 
             rootLayout = new TableLayoutPanel();
             panelHeader = new Panel();
-            panelSidebar = new Panel();
             panelContent = new Panel();
             lblBrand = new Label();
-            lblPageTitle = new Label();
             lblCurrentProduct = new Label();
             lblModelStatus = new Label();
-            btnDetection = CreateNavigationButton("01   检测工作台", 74, true);
-            btnRecords = CreateNavigationButton("02   检测记录", 126, false);
-            btnProduct = CreateNavigationButton("03   产品配置", 178, false);
-            btnSettings = CreateNavigationButton("04   系统设置", 230, false);
+            btnDetection = CreateTopNavigationButton("检测工作台", true);
+            btnRecords = CreateTopNavigationButton("检测记录", false);
+            btnProduct = CreateTopNavigationButton("产品配置", false);
+            btnSettings = CreateTopNavigationButton("系统设置", false);
             tabDetection = new TabDetection();
             placeholderPage = new Panel();
             lblPlaceholderTitle = new Label();
@@ -54,21 +50,17 @@ namespace _180Detection
             SuspendLayout();
 
             rootLayout.BackColor = UiTheme.WindowBackground;
-            rootLayout.ColumnCount = 2;
-            rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
+            rootLayout.ColumnCount = 1;
             rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             rootLayout.RowCount = 2;
-            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+            rootLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
             rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             rootLayout.Dock = DockStyle.Fill;
             rootLayout.Margin = Padding.Empty;
             rootLayout.Controls.Add(panelHeader, 0, 0);
-            rootLayout.SetColumnSpan(panelHeader, 2);
-            rootLayout.Controls.Add(panelSidebar, 0, 1);
-            rootLayout.Controls.Add(panelContent, 1, 1);
+            rootLayout.Controls.Add(panelContent, 0, 1);
 
             BuildHeader();
-            BuildSidebar();
             BuildContent();
 
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -91,85 +83,71 @@ namespace _180Detection
         private void BuildHeader()
         {
             panelHeader.BackColor = UiTheme.Surface;
-            panelHeader.BorderStyle = BorderStyle.FixedSingle;
             panelHeader.Dock = DockStyle.Fill;
             panelHeader.Margin = Padding.Empty;
 
             TableLayoutPanel headerLayout = new TableLayoutPanel();
-            headerLayout.ColumnCount = 5;
+            headerLayout.BackColor = UiTheme.Surface;
+            headerLayout.ColumnCount = 4;
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220F));
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
+            headerLayout.RowCount = 2;
+            headerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            headerLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1F));
             headerLayout.Dock = DockStyle.Fill;
             headerLayout.Margin = Padding.Empty;
 
             lblBrand.Dock = DockStyle.Fill;
-            lblBrand.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point, 134);
+            lblBrand.Font = new Font("Microsoft YaHei UI", 12.5F, FontStyle.Bold, GraphicsUnit.Point, 134);
             lblBrand.ForeColor = UiTheme.TextPrimary;
-            lblBrand.Padding = new Padding(20, 0, 0, 0);
+            lblBrand.Padding = new Padding(18, 0, 0, 0);
             lblBrand.Text = "科准 IAD";
             lblBrand.TextAlign = ContentAlignment.MiddleLeft;
 
-            lblPageTitle.Dock = DockStyle.Fill;
-            lblPageTitle.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point, 134);
-            lblPageTitle.ForeColor = UiTheme.TextPrimary;
-            lblPageTitle.Padding = new Padding(16, 0, 0, 0);
-            lblPageTitle.Text = "检测工作台";
-            lblPageTitle.TextAlign = ContentAlignment.MiddleLeft;
-
-            lblCurrentProduct.Dock = DockStyle.Fill;
-            lblCurrentProduct.Font = new Font("Microsoft YaHei UI", 10F);
-            lblCurrentProduct.ForeColor = UiTheme.TextSecondary;
-            lblCurrentProduct.Padding = new Padding(0, 0, 12, 0);
-            lblCurrentProduct.Text = "当前产品：Phone";
-            lblCurrentProduct.TextAlign = ContentAlignment.MiddleRight;
-
-            lblModelStatus.Dock = DockStyle.Fill;
-            lblModelStatus.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
-            lblModelStatus.ForeColor = UiTheme.TextSecondary;
-            lblModelStatus.Padding = new Padding(0, 0, 22, 0);
-            lblModelStatus.Text = "○ 推理脚本未配置";
-            lblModelStatus.TextAlign = ContentAlignment.MiddleRight;
-
-            headerLayout.Controls.Add(lblBrand, 0, 0);
-            headerLayout.Controls.Add(lblPageTitle, 1, 0);
-            headerLayout.Controls.Add(new Panel(), 2, 0);
-            headerLayout.Controls.Add(lblCurrentProduct, 3, 0);
-            headerLayout.Controls.Add(lblModelStatus, 4, 0);
-            panelHeader.Controls.Add(headerLayout);
-        }
-
-        private void BuildSidebar()
-        {
-            panelSidebar.BackColor = UiTheme.Sidebar;
-            panelSidebar.Dock = DockStyle.Fill;
-            panelSidebar.Margin = Padding.Empty;
-
-            Label caption = new Label();
-            caption.AutoSize = true;
-            caption.Font = new Font("Microsoft YaHei UI", 8.5F);
-            caption.ForeColor = Color.FromArgb(170, 170, 170);
-            caption.Location = new Point(18, 24);
-            caption.Text = "功能导航";
-
-            Label version = new Label();
-            version.Dock = DockStyle.Bottom;
-            version.Font = new Font("Microsoft YaHei UI", 8.5F);
-            version.ForeColor = Color.FromArgb(145, 145, 145);
-            version.Height = 48;
-            version.Padding = new Padding(18, 0, 0, 14);
-            version.Text = "Inference UI v0.2";
+            FlowLayoutPanel navigation = new FlowLayoutPanel();
+            navigation.BackColor = UiTheme.Surface;
+            navigation.Dock = DockStyle.Fill;
+            navigation.Margin = Padding.Empty;
+            navigation.Padding = new Padding(0);
+            navigation.WrapContents = false;
 
             btnDetection.Click += new System.EventHandler(btnDetection_Click);
             btnRecords.Click += new System.EventHandler(btnRecords_Click);
             btnProduct.Click += new System.EventHandler(btnProduct_Click);
             btnSettings.Click += new System.EventHandler(btnSettings_Click);
 
-            panelSidebar.Controls.AddRange(new Control[] {
-                caption, btnDetection, btnRecords, btnProduct, btnSettings, version
+            navigation.Controls.AddRange(new Control[] {
+                btnDetection, btnRecords, btnProduct, btnSettings
             });
+
+            lblCurrentProduct.Dock = DockStyle.Fill;
+            lblCurrentProduct.Font = new Font("Microsoft YaHei UI", 9F);
+            lblCurrentProduct.ForeColor = UiTheme.TextSecondary;
+            lblCurrentProduct.Padding = new Padding(0, 0, 12, 0);
+            lblCurrentProduct.Text = "当前产品：Phone";
+            lblCurrentProduct.TextAlign = ContentAlignment.MiddleRight;
+
+            lblModelStatus.Dock = DockStyle.Fill;
+            lblModelStatus.Font = new Font("Microsoft YaHei UI", 9F);
+            lblModelStatus.ForeColor = UiTheme.TextSecondary;
+            lblModelStatus.Padding = new Padding(0, 0, 18, 0);
+            lblModelStatus.Text = "○ 推理脚本未配置";
+            lblModelStatus.TextAlign = ContentAlignment.MiddleRight;
+
+            Panel separator = new Panel();
+            separator.BackColor = UiTheme.Border;
+            separator.Dock = DockStyle.Fill;
+            separator.Margin = Padding.Empty;
+
+            headerLayout.Controls.Add(lblBrand, 0, 0);
+            headerLayout.Controls.Add(navigation, 1, 0);
+            headerLayout.Controls.Add(lblCurrentProduct, 2, 0);
+            headerLayout.Controls.Add(lblModelStatus, 3, 0);
+            headerLayout.Controls.Add(separator, 0, 1);
+            headerLayout.SetColumnSpan(separator, 4);
+            panelHeader.Controls.Add(headerLayout);
         }
 
         private void BuildContent()
@@ -177,7 +155,7 @@ namespace _180Detection
             panelContent.BackColor = UiTheme.WindowBackground;
             panelContent.Dock = DockStyle.Fill;
             panelContent.Margin = Padding.Empty;
-            panelContent.Padding = new Padding(18);
+            panelContent.Padding = new Padding(12);
 
             tabDetection.BackColor = UiTheme.WindowBackground;
             tabDetection.Dock = DockStyle.Fill;
@@ -189,23 +167,24 @@ namespace _180Detection
             placeholderPage.Visible = false;
 
             TableLayoutPanel placeholderLayout = new TableLayoutPanel();
+            placeholderLayout.BackColor = UiTheme.Surface;
             placeholderLayout.ColumnCount = 1;
             placeholderLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             placeholderLayout.RowCount = 4;
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
+            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 43F));
+            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
+            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));
+            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 57F));
             placeholderLayout.Dock = DockStyle.Fill;
 
             lblPlaceholderTitle.Dock = DockStyle.Fill;
-            lblPlaceholderTitle.Font = new Font("Microsoft YaHei UI", 22F, FontStyle.Bold);
+            lblPlaceholderTitle.Font = new Font("Microsoft YaHei UI", 17F, FontStyle.Bold);
             lblPlaceholderTitle.ForeColor = UiTheme.TextPrimary;
             lblPlaceholderTitle.Text = "检测记录";
             lblPlaceholderTitle.TextAlign = ContentAlignment.MiddleCenter;
 
             lblPlaceholderDescription.Dock = DockStyle.Fill;
-            lblPlaceholderDescription.Font = new Font("Microsoft YaHei UI", 10F);
+            lblPlaceholderDescription.Font = new Font("Microsoft YaHei UI", 9F);
             lblPlaceholderDescription.ForeColor = UiTheme.TextSecondary;
             lblPlaceholderDescription.Padding = new Padding(120, 0, 120, 0);
             lblPlaceholderDescription.Text = "功能将在下一阶段实现。";
@@ -221,29 +200,25 @@ namespace _180Detection
             panelContent.Controls.Add(placeholderPage);
         }
 
-        private static Button CreateNavigationButton(string text, int top, bool active)
+        private static Button CreateTopNavigationButton(string text, bool active)
         {
             Button button = new Button();
-            button.BackColor = active ? UiTheme.SidebarActive : UiTheme.Sidebar;
+            button.AutoSize = false;
+            button.BackColor = active ? UiTheme.NavigationActive : UiTheme.Surface;
             button.Cursor = Cursors.Hand;
             button.FlatAppearance.BorderSize = 0;
-            button.FlatAppearance.MouseDownBackColor = active
-                ? Color.FromArgb(232, 232, 232)
-                : UiTheme.SidebarHover;
-            button.FlatAppearance.MouseOverBackColor = active
-                ? Color.FromArgb(245, 245, 245)
-                : UiTheme.SidebarHover;
+            button.FlatAppearance.MouseOverBackColor = UiTheme.NavigationHover;
+            button.FlatAppearance.MouseDownBackColor = UiTheme.NavigationPressed;
             button.FlatStyle = FlatStyle.Flat;
             button.Font = new Font(
                 "Microsoft YaHei UI",
-                10.5F,
+                9.5F,
                 active ? FontStyle.Bold : FontStyle.Regular);
-            button.ForeColor = active ? UiTheme.TextPrimary : Color.White;
-            button.Location = new Point(0, top);
-            button.Padding = new Padding(22, 0, 0, 0);
-            button.Size = new Size(210, 52);
+            button.ForeColor = active ? UiTheme.TextPrimary : UiTheme.TextSecondary;
+            button.Margin = Padding.Empty;
+            button.Size = new Size(112, 61);
             button.Text = text;
-            button.TextAlign = ContentAlignment.MiddleLeft;
+            button.TextAlign = ContentAlignment.MiddleCenter;
             button.UseVisualStyleBackColor = false;
             return button;
         }
