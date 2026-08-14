@@ -10,6 +10,8 @@ namespace _180Detection
     public partial class TabDetection : UserControl
     {
         private string _selectedImagePath;
+        private bool _inferenceAvailable;
+        private bool _busy;
 
         public event EventHandler DetectRequested;
         public event EventHandler ProductChanged;
@@ -21,7 +23,12 @@ namespace _180Detection
 
         public string SelectedProduct
         {
-            get { return cmbProduct.SelectedItem == null ? string.Empty : cmbProduct.SelectedItem.ToString(); }
+            get
+            {
+                return cmbProduct.SelectedItem == null
+                    ? string.Empty
+                    : cmbProduct.SelectedItem.ToString();
+            }
         }
 
         public TabDetection()
@@ -31,7 +38,6 @@ namespace _180Detection
 
             cmbProduct.Items.Add("Phone");
             cmbProduct.SelectedIndex = 0;
-            btnDetect.Enabled = false;
             Disposed += TabDetection_Disposed;
             SetWaitingState();
         }
@@ -60,7 +66,9 @@ namespace _180Detection
                 int selectedIndex = -1;
                 for (int i = 0; i < cmbProduct.Items.Count; i++)
                 {
-                    if (string.Equals(cmbProduct.Items[i].ToString(), selectedProduct,
+                    if (string.Equals(
+                        cmbProduct.Items[i].ToString(),
+                        selectedProduct,
                         StringComparison.OrdinalIgnoreCase))
                     {
                         selectedIndex = i;
@@ -79,6 +87,22 @@ namespace _180Detection
             }
         }
 
+        public void SetInferenceAvailable(bool available)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<bool>(SetInferenceAvailable), available);
+                return;
+            }
+
+            _inferenceAvailable = available;
+            UpdateDetectButtonState();
+
+            lblServiceHint.Text = available
+                ? "Python 推理接口已配置 · 选择图片后可直接检测"
+                : "Python 推理接口已接入 · 请先配置解释器和推理脚本";
+        }
+
         public void SetModelStatus(string text, bool ready)
         {
             if (InvokeRequired)
@@ -87,10 +111,36 @@ namespace _180Detection
                 return;
             }
 
-            lblModelState.Text = "● " + (string.IsNullOrWhiteSpace(text) ? "模型状态未知" : text.Trim());
+            lblModelState.Text = (ready ? "● " : "○ ") +
+                (string.IsNullOrWhiteSpace(text) ? "模型状态未知" : text.Trim());
             lblModelState.ForeColor = ready
-                ? Color.FromArgb(46, 173, 107)
-                : Color.FromArgb(229, 152, 52);
+                ? UiTheme.TextPrimary
+                : UiTheme.TextSecondary;
+        }
+
+        public void SetBusy(bool busy)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<bool>(SetBusy), busy);
+                return;
+            }
+
+            _busy = busy;
+            cmbProduct.Enabled = !busy;
+            btnChooseImage.Enabled = !busy;
+            btnOpenDirectory.Enabled = !busy;
+            btnDetect.Text = busy ? "检测中..." : "检测";
+            UpdateDetectButtonState();
+
+            if (busy)
+            {
+                lblStatus.Text = "状态：正在调用 Python 推理...";
+                lblElapsed.Text = "耗时：-- ms";
+                lblResultState.Text = "检测中";
+                lblResultState.ForeColor = UiTheme.TextPrimary;
+                lblServiceHint.Text = "推理进程运行中，请勿重复提交";
+            }
         }
 
         public void DisplayResult(DetectionResult result)
@@ -112,12 +162,12 @@ namespace _180Detection
                 LoadImageIntoViewer(displayImagePath);
 
             lblResultState.Text = result.IsNg ? "NG" : "PASS";
-            lblResultState.ForeColor = result.IsNg
-                ? Color.FromArgb(220, 68, 68)
-                : Color.FromArgb(31, 157, 85);
+            lblResultState.ForeColor = UiTheme.TextPrimary;
 
             lblDefectValue.Text = result.IsNg
-                ? (string.IsNullOrWhiteSpace(result.DefectClass) ? "Unknown" : result.DefectClass)
+                ? (string.IsNullOrWhiteSpace(result.DefectClass)
+                    ? "Unknown"
+                    : result.DefectClass)
                 : "Normal";
             lblScoreValue.Text = result.AnomalyScore.ToString("0.0000");
             lblSimilarityValue.Text = FormatSimilarity(result.Similarity);
@@ -126,16 +176,36 @@ namespace _180Detection
             string sourcePath = string.IsNullOrWhiteSpace(result.ImagePath)
                 ? _selectedImagePath
                 : result.ImagePath;
+
             lblFileValue.Text = string.IsNullOrWhiteSpace(sourcePath)
                 ? "--"
                 : Path.GetFileName(sourcePath);
 
             lblStatus.Text = "状态：检测完成";
-            lblElapsed.Text = "耗时：" + Math.Max(0L, result.ElapsedMilliseconds) + " ms";
+            lblElapsed.Text =
+                "耗时：" + Math.Max(0L, result.ElapsedMilliseconds) + " ms";
             lblStatusFile.Text = string.IsNullOrWhiteSpace(sourcePath)
                 ? "文件：--"
                 : "文件：" + Path.GetFileName(sourcePath);
+            lblServiceHint.Text = "推理完成 · 已读取 Python JSON 最终结果";
             lblViewerHint.Visible = pictureResult.Image == null;
+        }
+
+        public void DisplayError(string message)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<string>(DisplayError), message);
+                return;
+            }
+
+            lblResultState.Text = "ERROR";
+            lblResultState.ForeColor = UiTheme.TextPrimary;
+            lblStatus.Text = "状态：检测失败";
+            lblElapsed.Text = "耗时：-- ms";
+            lblServiceHint.Text = string.IsNullOrWhiteSpace(message)
+                ? "推理发生未知错误"
+                : message.Trim();
         }
 
         public void ClearResult()
@@ -147,7 +217,7 @@ namespace _180Detection
             }
 
             lblResultState.Text = "--";
-            lblResultState.ForeColor = Color.FromArgb(105, 116, 130);
+            lblResultState.ForeColor = UiTheme.TextSecondary;
             lblDefectValue.Text = "--";
             lblScoreValue.Text = "--";
             lblSimilarityValue.Text = "--";
@@ -163,7 +233,8 @@ namespace _180Detection
             using (OpenFileDialog dialog = new OpenFileDialog())
             {
                 dialog.Title = "选择待检测图片";
-                dialog.Filter = "图片文件|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff|所有文件|*.*";
+                dialog.Filter =
+                    "图片文件|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff|所有文件|*.*";
                 dialog.RestoreDirectory = true;
 
                 if (dialog.ShowDialog() != DialogResult.OK)
@@ -174,11 +245,16 @@ namespace _180Detection
                     _selectedImagePath = dialog.FileName;
                     LoadImageIntoViewer(_selectedImagePath);
                     ClearResult();
+
                     lblResultState.Text = "待检测";
-                    lblResultState.ForeColor = Color.FromArgb(42, 103, 218);
-                    lblStatus.Text = "状态：图片已选择，等待检测";
-                    lblStatusFile.Text = "文件：" + Path.GetFileName(_selectedImagePath);
-                    btnDetect.Enabled = true;
+                    lblResultState.ForeColor = UiTheme.TextPrimary;
+                    lblStatus.Text = _inferenceAvailable
+                        ? "状态：图片已选择，等待检测"
+                        : "状态：图片已选择，但推理尚未配置";
+                    lblStatusFile.Text =
+                        "文件：" + Path.GetFileName(_selectedImagePath);
+
+                    UpdateDetectButtonState();
                 }
                 catch (Exception ex)
                 {
@@ -193,33 +269,35 @@ namespace _180Detection
 
         private void btnDetect_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(_selectedImagePath) || !File.Exists(_selectedImagePath))
+            if (string.IsNullOrWhiteSpace(_selectedImagePath) ||
+                !File.Exists(_selectedImagePath))
             {
-                MessageBox.Show("请先选择一张待检测图片。", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "请先选择一张待检测图片。",
+                    "提示",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
-            lblStatus.Text = "状态：正在请求检测...";
-            lblElapsed.Text = "耗时：-- ms";
+            if (!_inferenceAvailable)
+            {
+                DisplayError(
+                    "推理服务未配置。请先配置 PythonExecutable 和 InferenceScript。");
+                return;
+            }
 
             EventHandler handler = DetectRequested;
             if (handler != null)
-            {
                 handler(this, EventArgs.Empty);
-                return;
-            }
-
-            lblStatus.Text = "状态：推理服务尚未接入，当前已完成 UI 骨架";
-            lblResultState.Text = "等待服务";
-            lblResultState.ForeColor = Color.FromArgb(229, 152, 52);
         }
 
         private void btnOpenDirectory_Click(object sender, EventArgs e)
         {
             try
             {
-                if (!string.IsNullOrWhiteSpace(_selectedImagePath) && File.Exists(_selectedImagePath))
+                if (!string.IsNullOrWhiteSpace(_selectedImagePath) &&
+                    File.Exists(_selectedImagePath))
                 {
                     Process.Start(new ProcessStartInfo
                     {
@@ -238,8 +316,11 @@ namespace _180Detection
             }
             catch (Exception ex)
             {
-                MessageBox.Show("无法打开目录：" + ex.Message, "错误",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    "无法打开目录：" + ex.Message,
+                    "错误",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -275,7 +356,7 @@ namespace _180Detection
         private void SetWaitingState()
         {
             lblResultState.Text = "--";
-            lblResultState.ForeColor = Color.FromArgb(105, 116, 130);
+            lblResultState.ForeColor = UiTheme.TextSecondary;
             lblDefectValue.Text = "--";
             lblScoreValue.Text = "--";
             lblSimilarityValue.Text = "--";
@@ -284,7 +365,27 @@ namespace _180Detection
             lblStatus.Text = "状态：等待图片";
             lblElapsed.Text = "耗时：-- ms";
             lblStatusFile.Text = "文件：--";
+            lblServiceHint.Text = "Python 推理接口已接入 · 等待配置";
             lblViewerHint.Visible = true;
+            UpdateDetectButtonState();
+        }
+
+        private void UpdateDetectButtonState()
+        {
+            bool hasImage = !string.IsNullOrWhiteSpace(_selectedImagePath) &&
+                            File.Exists(_selectedImagePath);
+            btnDetect.Enabled = !_busy && _inferenceAvailable && hasImage;
+
+            if (btnDetect.Enabled)
+            {
+                btnDetect.BackColor = UiTheme.PrimaryButton;
+                btnDetect.ForeColor = Color.White;
+            }
+            else
+            {
+                btnDetect.BackColor = UiTheme.Disabled;
+                btnDetect.ForeColor = Color.White;
+            }
         }
 
         private static string FormatSimilarity(double similarity)
@@ -292,6 +393,7 @@ namespace _180Detection
             double percent = similarity;
             if (percent >= 0D && percent <= 1D)
                 percent *= 100D;
+
             return Math.Max(0D, percent).ToString("0.00") + "%";
         }
 

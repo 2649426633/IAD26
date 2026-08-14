@@ -53,7 +53,7 @@ namespace _180Detection
 
             SuspendLayout();
 
-            rootLayout.BackColor = Color.FromArgb(244, 247, 250);
+            rootLayout.BackColor = UiTheme.WindowBackground;
             rootLayout.ColumnCount = 2;
             rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));
             rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -73,7 +73,7 @@ namespace _180Detection
 
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            BackColor = Color.FromArgb(244, 247, 250);
+            BackColor = UiTheme.WindowBackground;
             ClientSize = new Size(1440, 900);
             Controls.Add(rootLayout);
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
@@ -90,7 +90,8 @@ namespace _180Detection
 
         private void BuildHeader()
         {
-            panelHeader.BackColor = Color.White;
+            panelHeader.BackColor = UiTheme.Surface;
+            panelHeader.BorderStyle = BorderStyle.FixedSingle;
             panelHeader.Dock = DockStyle.Fill;
             panelHeader.Margin = Padding.Empty;
 
@@ -106,30 +107,30 @@ namespace _180Detection
 
             lblBrand.Dock = DockStyle.Fill;
             lblBrand.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point, 134);
-            lblBrand.ForeColor = Color.FromArgb(30, 41, 55);
+            lblBrand.ForeColor = UiTheme.TextPrimary;
             lblBrand.Padding = new Padding(20, 0, 0, 0);
             lblBrand.Text = "科准 IAD";
             lblBrand.TextAlign = ContentAlignment.MiddleLeft;
 
             lblPageTitle.Dock = DockStyle.Fill;
             lblPageTitle.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point, 134);
-            lblPageTitle.ForeColor = Color.FromArgb(54, 65, 78);
+            lblPageTitle.ForeColor = UiTheme.TextPrimary;
             lblPageTitle.Padding = new Padding(16, 0, 0, 0);
             lblPageTitle.Text = "检测工作台";
             lblPageTitle.TextAlign = ContentAlignment.MiddleLeft;
 
             lblCurrentProduct.Dock = DockStyle.Fill;
             lblCurrentProduct.Font = new Font("Microsoft YaHei UI", 10F);
-            lblCurrentProduct.ForeColor = Color.FromArgb(82, 92, 105);
+            lblCurrentProduct.ForeColor = UiTheme.TextSecondary;
             lblCurrentProduct.Padding = new Padding(0, 0, 12, 0);
             lblCurrentProduct.Text = "当前产品：Phone";
             lblCurrentProduct.TextAlign = ContentAlignment.MiddleRight;
 
             lblModelStatus.Dock = DockStyle.Fill;
             lblModelStatus.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
-            lblModelStatus.ForeColor = Color.FromArgb(229, 152, 52);
+            lblModelStatus.ForeColor = UiTheme.TextSecondary;
             lblModelStatus.Padding = new Padding(0, 0, 22, 0);
-            lblModelStatus.Text = "● 模型待接入";
+            lblModelStatus.Text = "○ 推理脚本未配置";
             lblModelStatus.TextAlign = ContentAlignment.MiddleRight;
 
             headerLayout.Controls.Add(lblBrand, 0, 0);
@@ -142,24 +143,24 @@ namespace _180Detection
 
         private void BuildSidebar()
         {
-            panelSidebar.BackColor = Color.FromArgb(29, 39, 52);
+            panelSidebar.BackColor = UiTheme.Sidebar;
             panelSidebar.Dock = DockStyle.Fill;
             panelSidebar.Margin = Padding.Empty;
 
             Label caption = new Label();
             caption.AutoSize = true;
             caption.Font = new Font("Microsoft YaHei UI", 8.5F);
-            caption.ForeColor = Color.FromArgb(128, 145, 164);
+            caption.ForeColor = Color.FromArgb(170, 170, 170);
             caption.Location = new Point(18, 24);
             caption.Text = "功能导航";
 
             Label version = new Label();
             version.Dock = DockStyle.Bottom;
             version.Font = new Font("Microsoft YaHei UI", 8.5F);
-            version.ForeColor = Color.FromArgb(128, 145, 164);
+            version.ForeColor = Color.FromArgb(145, 145, 145);
             version.Height = 48;
             version.Padding = new Padding(18, 0, 0, 14);
-            version.Text = "Inference UI v0.1";
+            version.Text = "Inference UI v0.2";
 
             btnDetection.Click += new System.EventHandler(btnDetection_Click);
             btnRecords.Click += new System.EventHandler(btnRecords_Click);
@@ -173,16 +174,17 @@ namespace _180Detection
 
         private void BuildContent()
         {
-            panelContent.BackColor = Color.FromArgb(244, 247, 250);
+            panelContent.BackColor = UiTheme.WindowBackground;
             panelContent.Dock = DockStyle.Fill;
             panelContent.Margin = Padding.Empty;
             panelContent.Padding = new Padding(18);
 
-            tabDetection.BackColor = Color.FromArgb(244, 247, 250);
+            tabDetection.BackColor = UiTheme.WindowBackground;
             tabDetection.Dock = DockStyle.Fill;
             tabDetection.Margin = Padding.Empty;
 
-            placeholderPage.BackColor = Color.White;
+            placeholderPage.BackColor = UiTheme.Surface;
+            placeholderPage.BorderStyle = BorderStyle.FixedSingle;
             placeholderPage.Dock = DockStyle.Fill;
             placeholderPage.Visible = false;
 
@@ -198,13 +200,13 @@ namespace _180Detection
 
             lblPlaceholderTitle.Dock = DockStyle.Fill;
             lblPlaceholderTitle.Font = new Font("Microsoft YaHei UI", 22F, FontStyle.Bold);
-            lblPlaceholderTitle.ForeColor = Color.FromArgb(45, 57, 70);
+            lblPlaceholderTitle.ForeColor = UiTheme.TextPrimary;
             lblPlaceholderTitle.Text = "检测记录";
             lblPlaceholderTitle.TextAlign = ContentAlignment.MiddleCenter;
 
             lblPlaceholderDescription.Dock = DockStyle.Fill;
             lblPlaceholderDescription.Font = new Font("Microsoft YaHei UI", 10F);
-            lblPlaceholderDescription.ForeColor = Color.FromArgb(108, 119, 132);
+            lblPlaceholderDescription.ForeColor = UiTheme.TextSecondary;
             lblPlaceholderDescription.Padding = new Padding(120, 0, 120, 0);
             lblPlaceholderDescription.Text = "功能将在下一阶段实现。";
             lblPlaceholderDescription.TextAlign = ContentAlignment.TopCenter;
@@ -222,12 +224,21 @@ namespace _180Detection
         private static Button CreateNavigationButton(string text, int top, bool active)
         {
             Button button = new Button();
-            button.BackColor = active ? Color.FromArgb(42, 103, 218) : Color.FromArgb(29, 39, 52);
+            button.BackColor = active ? UiTheme.SidebarActive : UiTheme.Sidebar;
             button.Cursor = Cursors.Hand;
             button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseDownBackColor = active
+                ? Color.FromArgb(232, 232, 232)
+                : UiTheme.SidebarHover;
+            button.FlatAppearance.MouseOverBackColor = active
+                ? Color.FromArgb(245, 245, 245)
+                : UiTheme.SidebarHover;
             button.FlatStyle = FlatStyle.Flat;
-            button.Font = new Font("Microsoft YaHei UI", 10.5F, active ? FontStyle.Bold : FontStyle.Regular);
-            button.ForeColor = Color.White;
+            button.Font = new Font(
+                "Microsoft YaHei UI",
+                10.5F,
+                active ? FontStyle.Bold : FontStyle.Regular);
+            button.ForeColor = active ? UiTheme.TextPrimary : Color.White;
             button.Location = new Point(0, top);
             button.Padding = new Padding(22, 0, 0, 0);
             button.Size = new Size(210, 52);

@@ -1,14 +1,17 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using _180Detection.Models;
+using _180Detection.Services;
 
 namespace _180Detection
 {
     public partial class Index : Form
     {
-        private readonly Color _activeNavigationColor = Color.FromArgb(42, 103, 218);
-        private readonly Color _inactiveNavigationColor = Color.FromArgb(29, 39, 52);
-        private readonly Color _navigationHoverColor = Color.FromArgb(38, 50, 66);
+        private readonly Color _activeNavigationColor = UiTheme.SidebarActive;
+        private readonly Color _inactiveNavigationColor = UiTheme.Sidebar;
+        private readonly Color _navigationHoverColor = UiTheme.SidebarHover;
+        private readonly InferenceService _inferenceService;
 
         public TabDetection TabDetectionPage
         {
@@ -18,13 +21,21 @@ namespace _180Detection
         public Index()
         {
             InitializeComponent();
+
+            _inferenceService = InferenceService.FromConfiguration();
             ConfigureNavigationButtons();
+
+            tabDetection.DetectRequested += TabDetection_DetectRequested;
+            tabDetection.ProductChanged += TabDetection_ProductChanged;
+
             ShowDetectionPage();
+            RefreshInferenceStatus();
         }
 
         private void Index_Load(object sender, EventArgs e)
         {
             WindowState = FormWindowState.Maximized;
+            RefreshInferenceStatus();
         }
 
         private void ConfigureNavigationButtons()
@@ -60,7 +71,7 @@ namespace _180Detection
             ShowPlaceholderPage(
                 btnRecords,
                 "检测记录",
-                "下一阶段将接入 results.json / results.csv / marked 目录，支持历史检测结果查询与回看。");
+                "下一阶段接入 results.json / results.csv / marked 目录，支持历史检测结果查询、筛选和回看。");
         }
 
         private void btnProduct_Click(object sender, EventArgs e)
@@ -68,7 +79,7 @@ namespace _180Detection
             ShowPlaceholderPage(
                 btnProduct,
                 "产品配置",
-                "下一阶段用于配置产品名称、PatchCore 模型目录、Defect Bank 与检测参数。此处不提供模型训练功能。");
+                "用于配置产品名称、PatchCore 模型目录、Defect Bank 与检测参数。此处不提供模型训练功能。");
         }
 
         private void btnSettings_Click(object sender, EventArgs e)
@@ -76,7 +87,7 @@ namespace _180Detection
             ShowPlaceholderPage(
                 btnSettings,
                 "系统设置",
-                "下一阶段用于配置 Python 解释器、推理程序目录、结果目录、保存策略与日志目录。");
+                "Python 推理接口已经接入。下一阶段将在此提供 Python 解释器、推理脚本、结果目录、保存策略和日志目录的可视化配置。");
         }
 
         private void ShowDetectionPage()
@@ -104,11 +115,73 @@ namespace _180Detection
             Button[] buttons = { btnDetection, btnRecords, btnProduct, btnSettings };
             foreach (Button button in buttons)
             {
-                button.BackColor = button == activeButton
-                    ? _activeNavigationColor
-                    : _inactiveNavigationColor;
-                button.ForeColor = Color.White;
+                bool active = button == activeButton;
+                button.BackColor = active ? _activeNavigationColor : _inactiveNavigationColor;
+                button.ForeColor = active ? UiTheme.TextPrimary : Color.White;
+                button.Font = new Font(
+                    "Microsoft YaHei UI",
+                    10.5F,
+                    active ? FontStyle.Bold : FontStyle.Regular);
+                button.FlatAppearance.MouseOverBackColor = active
+                    ? Color.FromArgb(245, 245, 245)
+                    : UiTheme.SidebarHover;
+                button.FlatAppearance.MouseDownBackColor = active
+                    ? Color.FromArgb(232, 232, 232)
+                    : UiTheme.SidebarHover;
             }
+        }
+
+        private async void TabDetection_DetectRequested(object sender, EventArgs e)
+        {
+            if (!_inferenceService.IsConfigured)
+            {
+                string status = _inferenceService.GetConfigurationStatus();
+                tabDetection.DisplayError(
+                    status + "。请先在 App.config 中配置 PythonExecutable 和 InferenceScript。");
+                RefreshInferenceStatus();
+                return;
+            }
+
+            tabDetection.SetBusy(true);
+            SetModelStatus("推理运行中", false);
+            tabDetection.SetModelStatus("推理运行中", false);
+
+            try
+            {
+                DetectionResult result = await _inferenceService.InspectAsync(
+                    tabDetection.SelectedImagePath,
+                    tabDetection.SelectedProduct);
+
+                tabDetection.DisplayResult(result);
+                SetModelStatus("模型就绪", true);
+                tabDetection.SetModelStatus("模型就绪", true);
+            }
+            catch (Exception ex)
+            {
+                tabDetection.DisplayError(ex.Message);
+                SetModelStatus("推理异常", false);
+                tabDetection.SetModelStatus("推理异常", false);
+            }
+            finally
+            {
+                tabDetection.SetBusy(false);
+            }
+        }
+
+        private void TabDetection_ProductChanged(object sender, EventArgs e)
+        {
+            SetCurrentProduct(tabDetection.SelectedProduct);
+        }
+
+        private void RefreshInferenceStatus()
+        {
+            string status = _inferenceService.GetConfigurationStatus();
+            bool configured = _inferenceService.IsConfigured;
+
+            SetCurrentProduct(tabDetection.SelectedProduct);
+            SetModelStatus(status, configured);
+            tabDetection.SetModelStatus(status, configured);
+            tabDetection.SetInferenceAvailable(configured);
         }
 
         public void SetCurrentProduct(string productName)
@@ -119,11 +192,11 @@ namespace _180Detection
 
         public void SetModelStatus(string statusText, bool ready)
         {
-            lblModelStatus.Text = "● " +
+            lblModelStatus.Text = (ready ? "● " : "○ ") +
                 (string.IsNullOrWhiteSpace(statusText) ? "模型状态未知" : statusText.Trim());
             lblModelStatus.ForeColor = ready
-                ? Color.FromArgb(46, 173, 107)
-                : Color.FromArgb(229, 152, 52);
+                ? UiTheme.TextPrimary
+                : UiTheme.TextSecondary;
         }
     }
 }
