@@ -10,22 +10,69 @@
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <DefaultItemExcludes>$(DefaultItemExcludes);runtime\**\*</DefaultItemExcludes>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="runtime\**\*.cs" />
-    <Compile Remove="Properties\Settings.Designer.cs" />
-    <Compile Remove="service\InferenceService.cs" />
-    <Compile Remove="page\TabMain.cs" />
-    <Compile Remove="page\TabMain.Designer.cs" />
-    <Compile Remove="page\TabTemplate.cs" />
-    <Compile Remove="page\TabTemplate.Designer.cs" />
-    <Compile Remove="page\TabAnalysis.cs" />
-    <Compile Remove="page\TabAnalysis.Designer.cs" />
-    <EmbeddedResource Remove="page\TabMain.resx" />
-    <EmbeddedResource Remove="page\TabTemplate.resx" />
-    <EmbeddedResource Remove="page\TabAnalysis.resx" />
+    <Compile Include="Program.cs" />
+    <Compile Include="camera\HikCameraService.cs" />
+    <Compile Include="model\AppSettings.cs" />
+    <Compile Include="model\DetectionResult.cs" />
+    <Compile Include="model\ProductConfig.cs" />
+    <Compile Include="service\AppSettingsService.cs" />
+    <Compile Include="service\OnnxInferenceService.cs" />
+    <Compile Include="service\ProductConfigService.cs" />
+    <Compile Include="style\UiTheme.cs" />
+
+    <Compile Include="page\Index.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="page\Index.Designer.cs">
+      <DependentUpon>Index.cs</DependentUpon>
+    </Compile>
+    <Compile Include="page\SmoothZoomPictureBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="page\ZoomViewportPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="page\TabDetection.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="page\TabDetection.Designer.cs">
+      <DependentUpon>TabDetection.cs</DependentUpon>
+    </Compile>
+    <Compile Include="page\TabRecords.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="page\TabProductConfig.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="page\TabSystemSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="page\Index.resx">
+      <DependentUpon>Index.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="page\TabDetection.resx">
+      <DependentUpon>TabDetection.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
