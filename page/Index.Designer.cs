@@ -18,9 +18,9 @@ namespace _180Detection
         private Button btnProduct;
         private Button btnSettings;
         private TabDetection tabDetection;
-        private Panel placeholderPage;
-        private Label lblPlaceholderTitle;
-        private Label lblPlaceholderDescription;
+        private TabRecords tabRecords;
+        private TabProductConfig tabProductConfig;
+        private TabSystemSettings tabSystemSettings;
 
         protected override void Dispose(bool disposing)
         {
@@ -45,9 +45,9 @@ namespace _180Detection
             btnProduct = CreateTopNavigationButton("产品配置", false);
             btnSettings = CreateTopNavigationButton("系统设置", false);
             tabDetection = new TabDetection();
-            placeholderPage = new Panel();
-            lblPlaceholderTitle = new Label();
-            lblPlaceholderDescription = new Label();
+            tabRecords = new TabRecords();
+            tabProductConfig = new TabProductConfig();
+            tabSystemSettings = new TabSystemSettings();
 
             SuspendLayout();
 
@@ -162,47 +162,21 @@ namespace _180Detection
             panelContent.Margin = Padding.Empty;
             panelContent.Padding = new Padding(12);
 
-            tabDetection.BackColor = UiTheme.WindowBackground;
-            tabDetection.Dock = DockStyle.Fill;
-            tabDetection.Margin = Padding.Empty;
+            Control[] pages = {
+                tabDetection, tabRecords, tabProductConfig, tabSystemSettings
+            };
 
-            placeholderPage.BackColor = UiTheme.Surface;
-            placeholderPage.BorderStyle = BorderStyle.FixedSingle;
-            placeholderPage.Dock = DockStyle.Fill;
-            placeholderPage.Visible = false;
+            foreach (Control page in pages)
+            {
+                page.BackColor = UiTheme.WindowBackground;
+                page.Dock = DockStyle.Fill;
+                page.Margin = Padding.Empty;
+                page.Visible = false;
+                panelContent.Controls.Add(page);
+            }
 
-            TableLayoutPanel placeholderLayout = new TableLayoutPanel();
-            placeholderLayout.BackColor = UiTheme.Surface;
-            placeholderLayout.ColumnCount = 1;
-            placeholderLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            placeholderLayout.RowCount = 4;
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 43F));
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));
-            placeholderLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 57F));
-            placeholderLayout.Dock = DockStyle.Fill;
-
-            lblPlaceholderTitle.Dock = DockStyle.Fill;
-            lblPlaceholderTitle.Font = new Font("Microsoft YaHei UI", 17F, FontStyle.Bold);
-            lblPlaceholderTitle.ForeColor = UiTheme.TextPrimary;
-            lblPlaceholderTitle.Text = "检测记录";
-            lblPlaceholderTitle.TextAlign = ContentAlignment.MiddleCenter;
-
-            lblPlaceholderDescription.Dock = DockStyle.Fill;
-            lblPlaceholderDescription.Font = new Font("Microsoft YaHei UI", 9F);
-            lblPlaceholderDescription.ForeColor = UiTheme.TextSecondary;
-            lblPlaceholderDescription.Padding = new Padding(120, 0, 120, 0);
-            lblPlaceholderDescription.Text = "功能将在下一阶段实现。";
-            lblPlaceholderDescription.TextAlign = ContentAlignment.TopCenter;
-
-            placeholderLayout.Controls.Add(new Panel(), 0, 0);
-            placeholderLayout.Controls.Add(lblPlaceholderTitle, 0, 1);
-            placeholderLayout.Controls.Add(lblPlaceholderDescription, 0, 2);
-            placeholderLayout.Controls.Add(new Panel(), 0, 3);
-            placeholderPage.Controls.Add(placeholderLayout);
-
-            panelContent.Controls.Add(tabDetection);
-            panelContent.Controls.Add(placeholderPage);
+            tabDetection.Visible = true;
+            tabDetection.BringToFront();
         }
 
         private static Button CreateTopNavigationButton(string text, bool active)

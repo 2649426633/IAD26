@@ -15,8 +15,8 @@ namespace _180Detection
         private readonly Color _activeNavigationColor = UiTheme.NavigationActive;
         private readonly Color _inactiveNavigationColor = UiTheme.Surface;
         private readonly Color _navigationHoverColor = UiTheme.NavigationHover;
-        private readonly InferenceService _inferenceService;
-        private readonly HikCameraService _cameraService;
+        private InferenceService _inferenceService;
+        private HikCameraService _cameraService;
 
         public TabDetection TabDetectionPage
         {
@@ -35,7 +35,10 @@ namespace _180Detection
             tabDetection.DetectRequested += TabDetection_DetectRequested;
             tabDetection.ProductChanged += TabDetection_ProductChanged;
             tabDetection.CameraConnectionRequested += TabDetection_CameraConnectionRequested;
+            tabProductConfig.ConfigurationsChanged += TabProductConfig_ConfigurationsChanged;
+            tabSystemSettings.SettingsSaved += TabSystemSettings_SettingsSaved;
 
+            RefreshProductList();
             ShowDetectionPage();
             RefreshInferenceStatus();
             RefreshCameraStatus();
@@ -44,13 +47,15 @@ namespace _180Detection
         private void Index_Load(object sender, EventArgs e)
         {
             WindowState = FormWindowState.Maximized;
+            RefreshProductList();
             RefreshInferenceStatus();
             RefreshCameraStatus();
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            _cameraService.Dispose();
+            if (_cameraService != null)
+                _cameraService.Dispose();
             base.OnFormClosed(e);
         }
 
@@ -84,44 +89,45 @@ namespace _180Detection
 
         private void btnRecords_Click(object sender, EventArgs e)
         {
-            ShowPlaceholderPage(
-                btnRecords,
-                "检测记录",
-                "下一阶段接入 results.json / results.csv / marked 目录，支持历史检测结果查询、筛选和回看。");
+            SelectNavigationButton(btnRecords);
+            HideAllPages();
+            tabRecords.RefreshRecords();
+            tabRecords.Visible = true;
+            tabRecords.BringToFront();
         }
 
         private void btnProduct_Click(object sender, EventArgs e)
         {
-            ShowPlaceholderPage(
-                btnProduct,
-                "产品配置",
-                "用于配置产品名称、PatchCore 模型目录、Defect Bank 与检测参数。此处不提供模型训练功能。");
+            SelectNavigationButton(btnProduct);
+            HideAllPages();
+            tabProductConfig.ReloadConfigurations();
+            tabProductConfig.Visible = true;
+            tabProductConfig.BringToFront();
         }
 
         private void btnSettings_Click(object sender, EventArgs e)
         {
-            ShowPlaceholderPage(
-                btnSettings,
-                "系统设置",
-                "用于配置 Python 推理、海康 MVS SDK、相机型号、结果目录、保存策略和日志目录。");
+            SelectNavigationButton(btnSettings);
+            HideAllPages();
+            tabSystemSettings.ReloadSettings();
+            tabSystemSettings.Visible = true;
+            tabSystemSettings.BringToFront();
         }
 
         private void ShowDetectionPage()
         {
             SelectNavigationButton(btnDetection);
-            placeholderPage.Visible = false;
+            HideAllPages();
             tabDetection.Visible = true;
             tabDetection.BringToFront();
         }
 
-        private void ShowPlaceholderPage(Button selectedButton, string title, string description)
+        private void HideAllPages()
         {
-            SelectNavigationButton(selectedButton);
-            lblPlaceholderTitle.Text = title;
-            lblPlaceholderDescription.Text = description;
             tabDetection.Visible = false;
-            placeholderPage.Visible = true;
-            placeholderPage.BringToFront();
+            tabRecords.Visible = false;
+            tabProductConfig.Visible = false;
+            tabSystemSettings.Visible = false;
         }
 
         private void SelectNavigationButton(Button activeButton)
@@ -179,7 +185,7 @@ namespace _180Detection
 
                 if (selectedIndex < 0)
                 {
-                    var names = new List<string>();
+                    List<string> names = new List<string>();
                     foreach (HikCameraDevice device in devices)
                         names.Add(device.DisplayName);
 
@@ -213,7 +219,7 @@ namespace _180Detection
             {
                 string status = _inferenceService.GetConfigurationStatus();
                 tabDetection.DisplayError(
-                    status + "。请先在 App.config 中配置 PythonExecutable 和 InferenceScript。");
+                    status + "。请先在“系统设置”中配置 Python 解释器和推理脚本。");
                 RefreshInferenceStatus();
                 return;
             }
@@ -231,6 +237,7 @@ namespace _180Detection
                 tabDetection.DisplayResult(result);
                 SetModelStatus("模型就绪", true);
                 tabDetection.SetModelStatus("模型就绪", true);
+                tabRecords.RefreshRecords();
             }
             catch (Exception ex)
             {
@@ -246,6 +253,40 @@ namespace _180Detection
 
         private void TabDetection_ProductChanged(object sender, EventArgs e)
         {
+            SetCurrentProduct(tabDetection.SelectedProduct);
+        }
+
+        private void TabProductConfig_ConfigurationsChanged(object sender, EventArgs e)
+        {
+            RefreshProductList();
+        }
+
+        private void TabSystemSettings_SettingsSaved(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_cameraService != null)
+                    _cameraService.Dispose();
+
+                _inferenceService = InferenceService.FromConfiguration();
+                _cameraService = new HikCameraService();
+
+                RefreshInferenceStatus();
+                RefreshCameraStatus();
+                tabRecords.RefreshRecords();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("重新加载运行配置失败：" + ex.Message, "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RefreshProductList()
+        {
+            string selected = tabDetection.SelectedProduct;
+            string[] products = tabProductConfig.GetEnabledProductNames();
+            tabDetection.SetProducts(products, selected);
             SetCurrentProduct(tabDetection.SelectedProduct);
         }
 
